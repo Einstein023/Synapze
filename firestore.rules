@@ -1,0 +1,114 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // 1. Default safety net (Lock down everything by default)
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- REUSABLE SECURITY PRIMITIVES ---
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && request.auth.token.email == 'uhunomaof@gmail.com';
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // --- ENTITY VALIDATORS ---
+    function isValidUser(data) {
+      return data.keys().hasAll(['uid', 'displayName', 'companionType', 'streakDays'])
+        && data.uid is string
+        && data.uid.size() <= 128
+        && data.displayName is string
+        && data.displayName.size() <= 100
+        && data.companionType is string
+        && data.companionType.size() <= 50
+        && data.streakDays is int
+        && data.streakDays >= 0;
+    }
+
+    function isValidSeedling(data) {
+      return data.keys().hasAll(['id', 'userId', 'title', 'content', 'status', 'isTask', 'isCompleted'])
+        && data.id is string
+        && data.id.size() <= 128
+        && data.userId is string
+        && data.userId.size() <= 128
+        && data.title is string
+        && data.title.size() <= 200
+        && data.content is string
+        && data.content.size() <= 100000
+        && data.status is string
+        && (data.status == 'active' || data.status == 'archived' || data.status == 'seedling' || data.status == 'growing' || data.status == 'harvested' || data.status == 'composted')
+        && data.isTask is bool
+        && data.isCompleted is bool;
+    }
+
+    function isValidActivityLog(data) {
+      return data.keys().hasAll(['id', 'userId', 'actionText', 'xpGained', 'timestamp'])
+        && data.id is string
+        && data.id.size() <= 128
+        && data.userId is string
+        && data.userId.size() <= 128
+        && data.actionText is string
+        && data.actionText.size() <= 500
+        && data.xpGained is int
+        && data.timestamp is string;
+    }
+
+    // --- MATCH BLOCKS ---
+    
+    // User Profile matching
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if isOwner(userId) && isValidUser(incoming());
+      allow update: if isOwner(userId) && isValidUser(incoming()) && incoming().uid == existing().uid;
+      allow delete: if isOwner(userId);
+    }
+
+    // Seedlings (Notes & Tasks)
+    match /users/{userId}/seedlings/{seedlingId} {
+      allow read: if isOwner(userId);
+      allow create: if isOwner(userId) && isValidId(seedlingId) && isValidSeedling(incoming());
+      allow update: if isOwner(userId) && isValidId(seedlingId) && isValidSeedling(incoming()) && incoming().id == existing().id && incoming().userId == existing().userId;
+      allow delete: if isOwner(userId) && isValidId(seedlingId);
+    }
+
+    // Activity Logs
+    match /users/{userId}/activities/{activityId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if isOwner(userId) && isValidId(activityId) && isValidActivityLog(incoming());
+      allow update: if false; // Action logs are immutable write-once metrics
+      allow delete: if isOwner(userId) && isValidId(activityId);
+    }
+
+    // Account Deletions Feedback
+    match /account_deletions/{docId} {
+      allow create: if isSignedIn();
+      allow read: if isAdmin();
+      allow update, delete: if false;
+    }
+
+    // Users Auth Public Registry Simulation
+    match /users_auth_public/{email} {
+      allow read, write: if isSignedIn();
+    }
+  }
+}

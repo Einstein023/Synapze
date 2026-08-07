@@ -1,0 +1,6 @@
+{
+  "name": "Synapze: Your Knowledge Garden",
+  "description": "An organic personal digital garden and markdown studio supporting offline synchronization, device notifications alerts, and a virtual companion bot.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

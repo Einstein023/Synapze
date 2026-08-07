@@ -1,0 +1,150 @@
+{
+  "entities": {
+    "User": {
+      "title": "User Profile",
+      "description": "User digital garden preferences, stats, and companion details",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "description": "The unique Firebase Auth user ID"
+        },
+        "displayName": {
+          "type": "string",
+          "description": "The gardener's screen name"
+        },
+        "bio": {
+          "type": "string",
+          "description": "A short motto or gardening intent statement"
+        },
+        "companionName": {
+          "type": "string",
+          "description": "Name designation for the digital companion Mascot"
+        },
+        "companionType": {
+          "type": "string",
+          "description": "Sproutling, Sage Pup, or Lumo Botanist"
+        },
+        "companionXp": {
+          "type": "integer",
+          "description": "XP of companion bot"
+        },
+        "streakDays": {
+          "type": "integer",
+          "description": "Consecutive days of planting and notes taking"
+        },
+        "lastActiveDate": {
+          "type": "string",
+          "description": "ISO date string of the last activity"
+        },
+        "theme": {
+          "type": "string",
+          "description": "The digital garden visual theme selection"
+        },
+        "pushNotifications": {
+          "type": "boolean",
+          "description": "Whether push alerts are configured and enabled"
+        }
+      },
+      "required": ["uid", "displayName", "companionType", "streakDays"]
+    },
+    "Seedling": {
+      "title": "Digital Garden Seedling",
+      "description": "A note, task, or thought planted in the digital garden",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for this thought seedling"
+        },
+        "userId": {
+          "type": "string",
+          "description": "The id of the owner gardener"
+        },
+        "title": {
+          "type": "string",
+          "description": "The title or hook of the note"
+        },
+        "content": {
+          "type": "string",
+          "description": "The Markdown content body"
+        },
+        "tags": {
+          "type": "array",
+          "description": "List of thematic labels"
+        },
+        "isTask": {
+          "type": "boolean",
+          "description": "Whether this represents an actionable item"
+        },
+        "isCompleted": {
+          "type": "boolean",
+          "description": "Whether the action element has been resolved"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["active", "archived", "seedling", "growing", "harvested", "composted"],
+          "description": "Current lifecycle state of the knowledge node"
+        },
+        "clonedFrom": {
+          "type": "string",
+          "description": "Indicates if cloned from a starter template"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "ISO timestamp of planting"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "ISO timestamp of last fertilization / edits"
+        }
+      },
+      "required": ["id", "userId", "title", "content", "status", "isTask", "isCompleted"]
+    },
+    "ActivityLog": {
+      "title": "Gardener Real-time Activity Log",
+      "description": "A capture log of real-time actions performed by the gardener used for live analytics",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Log UUID"
+        },
+        "userId": {
+          "type": "string",
+          "description": "Gardener owner's uid"
+        },
+        "actionText": {
+          "type": "string",
+          "description": "Human descriptive tag of what was completed"
+        },
+        "xpGained": {
+          "type": "integer",
+          "description": "XP granted to companion for this action"
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "description": "ISO format time of completion"
+        }
+      },
+      "required": ["id", "userId", "actionText", "xpGained", "timestamp"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "Global user profiles and garden statistics"
+    },
+    "/users/{userId}/seedlings/{seedlingId}": {
+      "schema": "Seedling",
+      "description": "User notes and checklists"
+    },
+    "/users/{userId}/activities/{activityId}": {
+      "schema": "ActivityLog",
+      "description": "Activity stream to power dashboard charts and real-time logs"
+    }
+  }
+}
