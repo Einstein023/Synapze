@@ -591,7 +591,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onNavigateToLanding,
                   value={displayName}
                   onChange={(e) => setDisplayName(e.target.value)}
                   placeholder="e.g. Master Sprout"
-                  className="w-full bg-slate-50 border border-slate-200 text-sm px-4 py-3 rounded-xl focus:outline-none focus:border-forest-500 text-slate-800 placeholder-slate-400 transition-colors focus:bg-white text-left"
+                  className="w-full bg-slate-50 border border-slate-200 text-base md:text-sm px-4 py-3.5 rounded-xl focus:outline-none focus:border-forest-500 text-slate-800 placeholder-slate-400 transition-colors focus:bg-white text-left font-medium min-h-[48px]"
                   required
                 />
               </div>
@@ -604,7 +604,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onNavigateToLanding,
                   value={bio}
                   onChange={(e) => setBio(e.target.value)}
                   placeholder="Intentional learning enthusiast..."
-                  className="w-full bg-slate-50 border border-slate-200 text-sm px-4 py-3 rounded-xl focus:outline-none focus:border-forest-500 text-slate-800 placeholder-slate-400 transition-colors focus:bg-white text-left"
+                  className="w-full bg-slate-50 border border-slate-200 text-base md:text-sm px-4 py-3.5 rounded-xl focus:outline-none focus:border-forest-500 text-slate-800 placeholder-slate-400 transition-colors focus:bg-white text-left font-medium min-h-[48px]"
                 />
               </div>
 

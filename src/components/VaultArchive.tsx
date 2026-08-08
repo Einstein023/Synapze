@@ -201,18 +201,18 @@ export const VaultArchive: React.FC<{ onNavigateToEditor: (id: string | null) =>
         {/* Search controls row */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 pb-6 border-b border-slate-100 text-left">
           
-          <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-slate-400" />
+          <div className="relative flex-1 max-w-lg">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
             <input
               type="text"
               value={searchVal}
               onChange={(e) => setSearchVal(e.target.value)}
               placeholder="Search by title, tag keyword..."
-              className="w-full bg-slate-50 border border-slate-200 focus:border-forest-500 text-sm pl-10 pr-4 py-2.5 rounded-xl focus:outline-none transition-colors focus:bg-white text-slate-700"
+              className="w-full bg-slate-50 border border-slate-200 focus:border-forest-500 text-sm pl-11 pr-4 py-3 sm:py-3.5 rounded-2xl focus:outline-none transition-colors focus:bg-white text-slate-700 min-h-[48px] font-sans font-medium"
             />
           </div>
 
-          <div className="flex gap-1.5 bg-slate-100 p-1 rounded-xl text-xs font-mono font-semibold self-start md:self-center">
+          <div className="flex gap-1.5 bg-slate-100 p-1.5 rounded-2xl text-xs font-mono font-semibold self-start md:self-center">
             {[
               { id: 'all', label: 'All notes' },
               { id: 'active', label: 'Active' },
@@ -221,8 +221,8 @@ export const VaultArchive: React.FC<{ onNavigateToEditor: (id: string | null) =>
               <button
                 key={option.id}
                 onClick={() => setFilterStatus(option.id)}
-                className={`px-3 py-1.5 rounded-lg select-none cursor-pointer uppercase text-[10px] leading-none transition-all ${
-                  filterStatus === option.id ? 'bg-white text-forest-600 shadow-xs' : 'text-slate-500 hover:text-slate-800'
+                className={`px-4 py-2.5 rounded-xl select-none cursor-pointer uppercase text-xs font-bold transition-all min-h-[44px] flex items-center justify-center ${
+                  filterStatus === option.id ? 'bg-white text-forest-700 shadow-sm' : 'text-slate-500 hover:text-slate-800'
                 }`}
               >
                 {option.label}

@@ -10,6 +10,7 @@ import { VaultArchive } from './components/VaultArchive';
 import { CommandSearch } from './components/CommandSearch';
 import { SettingsView, AvatarSvg } from './components/SettingsView';
 import { AdminConsoleView } from './components/AdminConsoleView';
+import { LegalView } from './components/LegalView';
 import { ToastNotification } from './components/ToastNotification';
 import { FloatingXpAlerts } from './components/FloatingXpAlerts';
 import { EvolutionModal } from './components/EvolutionModal';
@@ -49,7 +50,8 @@ function GardenAppContent() {
   } = useGarden();
 
   // Navigation and views controlling states
-  const [viewState, setViewState] = useState<'landing' | 'auth' | 'app'>('landing');
+  const [viewState, setViewState] = useState<'landing' | 'auth' | 'app' | 'legal'>('landing');
+  const [legalTab, setLegalTab] = useState<'terms' | 'privacy'>('terms');
   const [currentTab, setCurrentTab] = useState<'dashboard' | 'capture' | 'editor' | 'companion' | 'vault' | 'settings' | 'admin'>('dashboard');
   const [editingSeedlingId, setEditingSeedlingId] = useState<string | null>(null);
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
@@ -70,7 +72,7 @@ function GardenAppContent() {
       setShowLogoLoader(true);
       const timer = setTimeout(() => {
         setShowLogoLoader(false);
-      }, 3000);
+      }, 500);
       return () => clearTimeout(timer);
     }
   }, [viewState]);
@@ -168,6 +170,15 @@ function GardenAppContent() {
   };
 
   // Handle CTA transitions
+  if (viewState === 'legal') {
+    return (
+      <LegalView 
+        onBack={() => setViewState('landing')} 
+        defaultTab={legalTab} 
+      />
+    );
+  }
+
   if (viewState === 'landing') {
     return (
       <LandingView 
@@ -179,6 +190,10 @@ function GardenAppContent() {
           }
         }} 
         onNavigateToAuth={() => setViewState('auth')}
+        onNavigateToLegal={(tab) => {
+          setLegalTab(tab);
+          setViewState('legal');
+        }}
       />
     );
   }
@@ -188,6 +203,10 @@ function GardenAppContent() {
       <AuthView 
         onBack={() => setViewState('landing')} 
         onGoToWorkspace={() => setViewState('app')}
+        onNavigateToLegal={(tab) => {
+          setLegalTab(tab);
+          setViewState('legal');
+        }}
       />
     );
   }
@@ -422,15 +441,30 @@ function GardenAppContent() {
 
         {/* Mobile Navigation overlay slide out */}
         {isMobileMenuOpen && (
-          <div className="fixed inset-0 bg-slate-950/40 backdrop-blur-xs z-30 md:hidden animate-fade-in">
-            <div className="w-64 bg-white h-full p-5 space-y-6 shadow-2xl relative animate-slide-right flex flex-col justify-between">
+          <div 
+            className="fixed inset-0 bg-slate-950/40 backdrop-blur-xs z-30 md:hidden animate-fade-in"
+            onClick={() => setIsMobileMenuOpen(false)}
+          >
+            <div 
+              className="w-64 bg-white h-full p-5 space-y-6 shadow-2xl relative animate-slide-right flex flex-col justify-between"
+              onClick={(e) => e.stopPropagation()}
+            >
               
               <div className="space-y-6">
                 
                 {/* Brand label */}
-                <div className="flex items-center gap-2 pb-4 border-b border-slate-100">
-                  <Sprout className="w-5.5 h-5.5 text-forest-500 shrink-0" />
-                  <span className="font-display font-extrabold text-sm uppercase tracking-wider text-slate-800 font-mono">Synapze Mobile</span>
+                <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+                  <div className="flex items-center gap-2">
+                    <Sprout className="w-5.5 h-5.5 text-forest-500 shrink-0" />
+                    <span className="font-display font-extrabold text-sm uppercase tracking-wider text-slate-800 font-mono">Synapze Mobile</span>
+                  </div>
+                  <button
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    className="p-1 text-slate-400 hover:text-slate-700 cursor-pointer min-h-[44px] flex items-center justify-center"
+                    aria-label="Close drawer"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
                 </div>
 
                 {/* Nav Links */}
@@ -447,7 +481,7 @@ function GardenAppContent() {
                     <button
                       key={tab.id}
                       onClick={() => { setCurrentTab(tab.id as any); setEditingSeedlingId(null); setIsMobileMenuOpen(false); }}
-                      className={`w-full text-left px-4 py-3 rounded-xl text-xs font-semibold uppercase tracking-wider flex items-center gap-3 cursor-pointer ${
+                      className={`w-full text-left px-4 py-3 rounded-xl text-xs font-semibold uppercase tracking-wider flex items-center gap-3 cursor-pointer min-h-[44px] ${
                         currentTab === tab.id 
                           ? (tab.id === 'admin' ? 'bg-slate-900 text-white shadow-md' : 'bg-forest-500 text-white shadow-md') 
                           : 'text-slate-500 hover:bg-slate-50'
@@ -461,7 +495,7 @@ function GardenAppContent() {
 
               </div>
 
-              {/* Mobile indicators */}
+              {/* Mobile indicators & Sign Out */}
               <div className="space-y-3.5 border-t border-slate-100 pt-4">
                 {/* Connection status indicator for mobile */}
                 <div className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200/80 bg-slate-50 font-mono text-[10px] select-none text-center">
@@ -477,6 +511,20 @@ function GardenAppContent() {
                     </span>
                   )}
                 </div>
+
+                {/* Mobile Sign Out Button */}
+                {isAuthenticated && (
+                  <button
+                    onClick={() => {
+                      setIsMobileMenuOpen(false);
+                      handleSignOut();
+                    }}
+                    className="w-full py-3 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs rounded-xl transition-all border border-rose-200/60 flex items-center justify-center gap-2 cursor-pointer min-h-[44px]"
+                  >
+                    <LogOut className="w-4 h-4" />
+                    <span>Sign Out</span>
+                  </button>
+                )}
 
                 <div className="text-[10px] text-slate-400 font-mono text-center">
                   active streak {profile.streakDays} days

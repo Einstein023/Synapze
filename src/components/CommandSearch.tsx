@@ -90,14 +90,14 @@ export const CommandSearch: React.FC<CommandSearchProps> = ({ onNavigate, onSele
   }, [selectedIndex, filteredResults, onClose]);
 
   return (
-    <div className="fixed inset-0 bg-slate-950/45 backdrop-blur-md z-50 flex items-start justify-center p-4 md:p-20 leading-relaxed font-sans animate-fade-in">
+    <div className="fixed inset-0 bg-slate-950/45 backdrop-blur-md z-50 flex items-start justify-center p-3 sm:p-6 md:p-20 leading-relaxed font-sans animate-fade-in">
       
       {/* Search canvas card: Clean light mode slate styling */}
-      <div className="bg-white border border-slate-200/80 text-slate-800 max-w-2xl w-full rounded-2xl shadow-2xl relative overflow-hidden mt-6 md:mt-12 flex flex-col max-h-[80vh]">
+      <div className="bg-white border border-slate-200/80 text-slate-800 max-w-3xl w-full rounded-2xl sm:rounded-3xl shadow-2xl relative overflow-hidden mt-2 sm:mt-6 md:mt-12 flex flex-col max-h-[85vh]">
         
         {/* Core input field search */}
-        <div className="flex items-center gap-3.5 border-b border-slate-100 bg-slate-50/40 px-5 py-4 shrink-0">
-          <Search className="w-5 h-5 text-forest-500 shrink-0" />
+        <div className="flex items-center gap-4 border-b border-slate-100 bg-slate-50/60 px-5 sm:px-7 py-4 sm:py-5 shrink-0 min-h-[64px]">
+          <Search className="w-6 h-6 text-emerald-600 shrink-0" />
           <input
             ref={inputRef}
             type="text"
@@ -107,20 +107,21 @@ export const CommandSearch: React.FC<CommandSearchProps> = ({ onNavigate, onSele
               setSelectedIndex(0);
             }}
             placeholder="Type 'editor' or 'seedling' tag keywords to search..."
-            className="w-full bg-transparent border-0 text-slate-800 placeholder-slate-400 focus:outline-none text-sm md:text-base font-medium font-sans"
+            className="w-full bg-transparent border-0 text-slate-800 placeholder-slate-400 focus:outline-none text-base sm:text-lg md:text-xl font-medium font-sans min-h-[48px]"
           />
           <button 
             onClick={onClose}
-            className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100/85 rounded-lg cursor-pointer transition-colors"
+            className="p-2.5 text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 rounded-xl cursor-pointer transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center shrink-0"
+            aria-label="Close search"
           >
-            <X className="w-4 h-4" />
+            <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Results List scrollable */}
-        <div className="flex-1 overflow-y-auto custom-scrollbar p-3 space-y-1 bg-white select-none min-h-0">
+        <div className="flex-1 overflow-y-auto custom-scrollbar p-3 sm:p-4 space-y-1.5 bg-white select-none min-h-0">
           {filteredResults.length === 0 ? (
-            <div className="py-12 text-center text-slate-400 text-xs font-mono">
+            <div className="py-14 text-center text-slate-400 text-sm font-mono">
               No {searchQuery ? `"${searchQuery}"` : 'results'} found
             </div>
           ) : (
@@ -134,20 +135,20 @@ export const CommandSearch: React.FC<CommandSearchProps> = ({ onNavigate, onSele
                     onClose();
                   }}
                   onMouseEnter={() => setSelectedIndex(idx)}
-                  className={`px-4 py-3 rounded-xl cursor-pointer flex items-center justify-between gap-4 transition-all duration-150 ${
+                  className={`px-4 sm:px-5 py-3.5 sm:py-4 rounded-xl cursor-pointer flex items-center justify-between gap-4 transition-all duration-150 min-h-[52px] ${
                     isSelected 
                       ? 'bg-forest-50 border border-forest-100/80 text-forest-950 shadow-xs' 
                       : 'text-slate-600 border border-transparent hover:bg-slate-50/70 hover:text-slate-900'
                   }`}
                 >
-                  <div className="flex items-center gap-3 min-w-0">
+                  <div className="flex items-center gap-3.5 min-w-0">
                     <span className={`shrink-0 transition-colors ${isSelected ? 'text-forest-600' : 'text-slate-400/80'}`}>
                       {item.icon}
                     </span>
-                    <span className="text-xs md:text-sm truncate select-none font-sans font-medium">{item.title}</span>
+                    <span className="text-sm sm:text-base truncate select-none font-sans font-medium">{item.title}</span>
                   </div>
                   <div className="flex items-center gap-3 shrink-0 uppercase font-mono">
-                    <span className={`text-[9px] font-semibold px-2 py-0.5 rounded border transition-colors ${
+                    <span className={`text-[10px] font-semibold px-2.5 py-1 rounded-lg border transition-colors ${
                       isSelected 
                         ? 'bg-forest-100/60 border-forest-200/50 text-forest-800' 
                         : 'bg-slate-50 border-slate-100 text-slate-400'
@@ -155,7 +156,7 @@ export const CommandSearch: React.FC<CommandSearchProps> = ({ onNavigate, onSele
                       {item.category}
                     </span>
                     {isSelected && (
-                      <span className="text-[9px] text-forest-600 font-bold shrink-0 hidden lg:inline ml-1">
+                      <span className="text-[10px] text-forest-600 font-bold shrink-0 hidden lg:inline ml-1">
                         [ENTER]
                       </span>
                     )}

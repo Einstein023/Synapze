@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { ChevronLeft, X, RefreshCw, Eye, EyeOff, ChevronDown, Check } from 'lucide-react';
+import { ChevronLeft, X, RefreshCw, Eye, EyeOff, ChevronDown, Check, ShieldCheck, Key, Lock, Globe } from 'lucide-react';
 import { AvatarSvg } from './SettingsView';
 import { getFriendlyErrorMessage } from '../lib/errorUtils';
+import { useGarden } from '../lib/gardenState';
 
 interface DeleteAccountViewProps {
   profile: {
@@ -33,6 +34,8 @@ export const DeleteAccountView: React.FC<DeleteAccountViewProps> = ({
   triggerPushNotification,
   onNavigateToLanding
 }) => {
+  const { authProvider } = useGarden();
+
   // Page core states
   const [reason, setReason] = useState('');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -486,7 +489,7 @@ export const DeleteAccountView: React.FC<DeleteAccountViewProps> = ({
                   <button
                     type="button"
                     onClick={() => setActiveModal(null)}
-                    className="w-full sm:flex-1 py-3 bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 hover:text-slate-800 font-bold text-xs sm:text-sm rounded-xl sm:rounded-2xl transition-all cursor-pointer"
+                    className="w-full sm:flex-1 py-3.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 hover:text-slate-900 font-bold text-sm rounded-2xl transition-all cursor-pointer min-h-[48px]"
                     id="warning-back-btn"
                   >
                     Back
@@ -495,7 +498,7 @@ export const DeleteAccountView: React.FC<DeleteAccountViewProps> = ({
                     type="button"
                     onClick={handleConfirmAction}
                     disabled={isVerifying}
-                    className="w-full sm:flex-1 py-3 bg-[#203d36] hover:bg-black disabled:bg-[#203d36]/70 text-white font-bold text-xs sm:text-sm rounded-xl sm:rounded-2xl transition-all cursor-pointer flex items-center justify-center gap-2"
+                    className="w-full sm:flex-1 py-3.5 bg-[#203d36] hover:bg-black disabled:bg-[#203d36]/70 text-white font-bold text-sm rounded-2xl transition-all cursor-pointer flex items-center justify-center gap-2 min-h-[48px]"
                     id="warning-confirm-btn"
                   >
                     {isVerifying ? (
@@ -543,6 +546,26 @@ export const DeleteAccountView: React.FC<DeleteAccountViewProps> = ({
                 <h2 className="font-sans font-bold text-slate-900 text-lg sm:text-xl" id="delete-profile-name">
                   {profile.displayName || userEmail || 'Yanika Phuthon'}
                 </h2>
+
+                {/* Detected Auth Provider Badge */}
+                <div className="pt-1 flex items-center justify-center">
+                  <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border ${
+                    authProvider === 'google'
+                      ? 'bg-blue-50 text-blue-700 border-blue-200'
+                      : authProvider === 'github'
+                      ? 'bg-purple-50 text-purple-700 border-purple-200'
+                      : 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                  }`}>
+                    <ShieldCheck className="w-3.5 h-3.5" />
+                    <span>
+                      {authProvider === 'google'
+                        ? 'Authenticated via Google OAuth'
+                        : authProvider === 'github'
+                        ? 'Authenticated via GitHub OAuth'
+                        : 'Authenticated via Email & Password'}
+                    </span>
+                  </span>
+                </div>
               </div>
 
               {/* Reason Section */}

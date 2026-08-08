@@ -29,7 +29,7 @@ if (isFirebaseConfigured) {
         localCache: persistentLocalCache({
           tabManager: persistentMultipleTabManager()
         }),
-        experimentalForceLongPolling: true
+        experimentalAutoDetectLongPolling: true
       }, firebaseConfig.firestoreDatabaseId || "(default)");
     } catch (cacheErr) {
       console.warn("Could not initialize persistent cache Firestore, falling back to standard getFirestore:", cacheErr);
@@ -100,18 +100,18 @@ export async function testConnection() {
   
   // Dynamic import to avoid SSR hurdles or mock environments
   try {
-    const { doc, getDocFromServer } = await import('firebase/firestore');
+    const { doc, getDoc } = await import('firebase/firestore');
     
-    // Race connection check with a fast-fail 2-second timeout promise
+    // Race connection check with a fast-fail 1.5-second timeout promise
     let timeoutId: any;
     const timeoutPromise = new Promise((_, reject) => {
       timeoutId = setTimeout(() => {
-        reject(new Error('Connection check timed out (2s limit exceeded)'));
-      }, 2000);
+        reject(new Error('Connection check timed out'));
+      }, 1500);
     });
 
     await Promise.race([
-      getDocFromServer(doc(db, 'test', 'connection')).then((val) => {
+      getDoc(doc(db, 'test', 'connection')).then((val) => {
         clearTimeout(timeoutId);
         return val;
       }),
@@ -119,7 +119,7 @@ export async function testConnection() {
     ]);
     console.log("Firebase Connection verified successfully.");
   } catch (error) {
-    console.warn("Firebase is running in offline/serverless mode (safe local storage caching is active):", error instanceof Error ? error.message : error);
+    console.warn("Firebase operating in offline/cached mode:", error instanceof Error ? error.message : error);
   }
 }
 

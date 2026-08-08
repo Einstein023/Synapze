@@ -19,9 +19,10 @@ import {
 interface LandingViewProps {
   onStart: () => void;
   onNavigateToAuth: () => void;
+  onNavigateToLegal?: (tab: 'terms' | 'privacy') => void;
 }
 
-export const LandingView: React.FC<LandingViewProps> = ({ onStart, onNavigateToAuth }) => {
+export const LandingView: React.FC<LandingViewProps> = ({ onStart, onNavigateToAuth, onNavigateToLegal }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   // Let the user check off things on the live mock post-it note in the hero!
   const [todoItems, setTodoItems] = useState([
@@ -204,10 +205,6 @@ export const LandingView: React.FC<LandingViewProps> = ({ onStart, onNavigateToA
             Features
             <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-[#203d36] transition-all group-hover:w-full" />
           </a>
-          <a href="#pricing" className="hover:text-[#203d36] transition-colors relative group py-1">
-            Pricing
-            <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-[#203d36] transition-all group-hover:w-full" />
-          </a>
           <a href="#community" className="hover:text-[#203d36] transition-colors relative group py-1">
             Community
             <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-[#203d36] transition-all group-hover:w-full" />
@@ -265,13 +262,6 @@ export const LandingView: React.FC<LandingViewProps> = ({ onStart, onNavigateToA
                 Features
               </a>
               <a 
-                href="#pricing" 
-                onClick={() => setMobileMenuOpen(false)}
-                className="text-base font-semibold text-[#203d36] hover:text-[#5c6e66] py-2 border-b border-slate-100"
-              >
-                Pricing
-              </a>
-              <a 
                 href="#community" 
                 onClick={() => setMobileMenuOpen(false)}
                 className="text-base font-semibold text-[#203d36] hover:text-[#5c6e66] py-2 border-b border-slate-100"
@@ -316,18 +306,6 @@ export const LandingView: React.FC<LandingViewProps> = ({ onStart, onNavigateToA
           className="lg:col-span-6 space-y-6 text-left"
         >
           
-          {/* Upper Blue Badge */}
-          <motion.div 
-            variants={heroItemVariants}
-            whileHover={{ scale: 1.05 }}
-            animate={{ y: [-3, 3, -3] }}
-            transition={{ y: { duration: 3.5, repeat: Infinity, ease: "easeInOut" } }}
-            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#d8efff] text-[#1b4d66] text-xs font-semibold tracking-wide border border-[#b8e0fe]"
-          >
-            <Sparkles className="w-3.5 h-3.5 text-[#3b82f6] animate-pulse" />
-            <span>NEW: AI-POWERED SUMMARIES</span>
-          </motion.div>
-
           {/* Heading */}
           <motion.h1 
             variants={heroItemVariants}
@@ -856,17 +834,10 @@ export const LandingView: React.FC<LandingViewProps> = ({ onStart, onNavigateToA
               whileHover={{ y: 2, scale: 0.98, boxShadow: "0px 4px 8px rgba(0,0,0,0.1)" }}
               whileTap={{ y: 4, scale: 0.95 }}
               transition={{ type: "spring", stiffness: 450, damping: 15 }}
-              className="w-full sm:w-auto px-8 py-4 bg-[#9c6d10] hover:bg-[#855b11] text-white font-bold rounded-xl text-base shadow-lg cursor-pointer"
+              className="w-full sm:w-auto px-8 py-4 bg-[#9c6d10] hover:bg-[#855b11] text-white font-bold rounded-xl text-base shadow-lg cursor-pointer min-h-[44px]"
             >
               Get Started for Free
             </motion.button>
-
-            <a
-              href="#pricing"
-              className="w-full sm:w-auto px-8 py-4 bg-transparent text-white border border-white/40 rounded-xl font-bold text-base cursor-pointer hover:bg-white/10 transition-colors flex items-center justify-center"
-            >
-              View Pricing
-            </a>
           </div>
         </div>
       </section>
@@ -881,15 +852,23 @@ export const LandingView: React.FC<LandingViewProps> = ({ onStart, onNavigateToA
             <Sprout className="w-4.5 h-4.5 text-[#427a5b]" />
             <span className="font-serif font-extrabold text-sm text-[#203d36]">Synapze</span>
             <span className="text-slate-400">|</span>
-            <span>© 2024 Synapze Labs. Planted with care.</span>
+            <span>© 2026 Synapze Labs. Planted with care.</span>
           </div>
 
           {/* Links bottom right */}
           <div className="flex flex-wrap items-center justify-center gap-6 text-slate-500 font-semibold font-sans">
-            <a href="#" className="hover:text-[#203d36] transition-colors">Privacy</a>
-            <a href="#" className="hover:text-[#203d36] transition-colors">Terms</a>
-            <a href="#" className="hover:text-[#203d36] transition-colors">Changelog</a>
-            <a href="#" className="hover:text-[#203d36] transition-colors">Status</a>
+            <button 
+              onClick={() => onNavigateToLegal?.('privacy')}
+              className="hover:text-[#203d36] transition-colors cursor-pointer min-h-[44px] flex items-center"
+            >
+              Privacy Policy
+            </button>
+            <button 
+              onClick={() => onNavigateToLegal?.('terms')}
+              className="hover:text-[#203d36] transition-colors cursor-pointer min-h-[44px] flex items-center"
+            >
+              Terms of Service
+            </button>
           </div>
         </div>
       </footer>

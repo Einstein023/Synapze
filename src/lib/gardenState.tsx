@@ -149,7 +149,9 @@ interface GardenContextType {
   verifyPassword: (password: string) => Promise<boolean>;
   deactivateAccount: (password: string) => Promise<{ success: boolean; message: string }>;
   deleteAccount: (password: string, reason?: string) => Promise<{ success: boolean; message: string }>;
+  authProvider: string;
   sendRecoveryOtp: (email: string) => Promise<{ success: boolean; message: string }>;
+  verifyOtpOnly: (email: string, otpCode: string) => Promise<{ success: boolean; message: string }>;
   verifyOtpAndSetPassword: (email: string, otpCode: string, newPassword: string) => Promise<{ success: boolean; message: string }>;
   sendMagicLink: (email: string) => Promise<{ success: boolean; message: string }>;
   signInWithDiscord: () => Promise<void>;
@@ -249,6 +251,7 @@ export const GardenProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [currentUserUid, setCurrentUserUid] = useState<string>('garden-guest');
+  const [authProvider, setAuthProvider] = useState<string>('email');
 
   const [xpPopups, setXpPopups] = useState<{ id: string; amount: number; source: string; timestamp: number }[]>([]);
   const [evolutionTrigger, setEvolutionTrigger] = useState<{ active: boolean; prevLevel: number; nextLevel: number; companionName: string; prevEmoji: string; nextEmoji: string; title: string } | null>(null);
@@ -332,6 +335,17 @@ export const GardenProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         setIsAuthenticated(true);
         setUserEmail(user.email);
         setCurrentUserUid(user.uid);
+        
+        // Detect Auth Provider
+        if (user.providerData && user.providerData.length > 0) {
+          const pId = user.providerData[0].providerId || '';
+          if (pId.includes('google')) setAuthProvider('google');
+          else if (pId.includes('github')) setAuthProvider('github');
+          else setAuthProvider('email');
+        } else {
+          setAuthProvider('email');
+        }
+
         localStorage.setItem('synapze_author_uid', user.uid);
         localStorage.setItem('synapze_author_email', user.email || '');
         
@@ -1266,6 +1280,36 @@ export const GardenProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     };
   };
 
+  const verifyOtpOnly = async (email: string, otpCode: string): Promise<{ success: boolean; message: string }> => {
+    const normalizedEmail = email.toLowerCase().trim();
+    let reg = getRegistry();
+
+    if (isFirebaseConfigured && db && !isOffline) {
+      try {
+        const { doc, getDoc } = await import('firebase/firestore');
+        const docSnap = await getDoc(doc(db, 'users_auth_public', normalizedEmail));
+        if (docSnap.exists()) {
+          reg[normalizedEmail] = docSnap.data() as RegistryUser;
+        }
+      } catch {}
+    }
+
+    const userRecord = reg[normalizedEmail];
+    if (!userRecord || !userRecord.otpCode) {
+      return { success: false, message: "No active recovery sequence found for this email." };
+    }
+
+    if (userRecord.otpCode !== otpCode) {
+      return { success: false, message: "Invalid verification code." };
+    }
+
+    if (Date.now() > (userRecord.otpExpiresAt || 0)) {
+      return { success: false, message: "The recovery code has expired (10 minutes limit reached)." };
+    }
+
+    return { success: true, message: "Verification code confirmed." };
+  };
+
   // 5. Verify OTP and Set Password
   const verifyOtpAndSetPassword = async (email: string, otpCode: string, newPassword: string): Promise<{ success: boolean; message: string }> => {
     const normalizedEmail = email.toLowerCase().trim();
@@ -1431,7 +1475,9 @@ export const GardenProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       verifyPassword,
       deactivateAccount,
       deleteAccount,
+      authProvider,
       sendRecoveryOtp,
+      verifyOtpOnly,
       verifyOtpAndSetPassword,
       sendMagicLink,
       signInWithDiscord

@@ -14,7 +14,11 @@ import {
   ArrowRight
 } from 'lucide-react';
 
-export const AuthView: React.FC<{ onBack: () => void; onGoToWorkspace?: () => void }> = ({ onBack, onGoToWorkspace }) => {
+export const AuthView: React.FC<{ 
+  onBack: () => void; 
+  onGoToWorkspace?: () => void;
+  onNavigateToLegal?: (tab: 'terms' | 'privacy') => void;
+}> = ({ onBack, onGoToWorkspace, onNavigateToLegal }) => {
   const { 
     signInWithGoogle, 
     signInWithEmail, 
@@ -24,8 +28,8 @@ export const AuthView: React.FC<{ onBack: () => void; onGoToWorkspace?: () => vo
     userEmail, 
     signOutUser,
     sendRecoveryOtp,
-    verifyOtpAndSetPassword,
-    sendMagicLink
+    verifyOtpOnly,
+    verifyOtpAndSetPassword
   } = useGarden();
 
   // Primary Auth States
@@ -37,17 +41,12 @@ export const AuthView: React.FC<{ onBack: () => void; onGoToWorkspace?: () => vo
   const [showPassword, setShowPassword] = useState(false);
   const [agreedToTerms, setAgreedToTerms] = useState(false);
 
-  // Magic Link States
-  const [useMagicLink, setUseMagicLink] = useState(false);
-  const [magicLinkSent, setMagicLinkSent] = useState(false);
-  const [magicLinkLoading, setMagicLinkLoading] = useState(false);
-  const [magicLinkMessage, setMagicLinkMessage] = useState('');
-
   // Password Recovery States
-  const [authMode, setAuthMode] = useState<'auth' | 'forgot_password' | 'verify_otp'>('auth');
+  const [authMode, setAuthMode] = useState<'auth' | 'forgot_password' | 'verify_otp' | 'new_password'>('auth');
   const [recoveryEmail, setRecoveryEmail] = useState('');
   const [otpCode, setOtpCode] = useState('');
   const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [otpLoading, setOtpLoading] = useState(false);
   const [otpSuccessMsg, setOtpSuccessMsg] = useState('');
 
@@ -62,14 +61,40 @@ export const AuthView: React.FC<{ onBack: () => void; onGoToWorkspace?: () => vo
     setOtpLoading(true);
 
     try {
-      // Scale Throttle Delay Simulation
-      await new Promise(resolve => setTimeout(resolve, 800));
+      await new Promise(resolve => setTimeout(resolve, 600));
       const res = await sendRecoveryOtp(recoveryEmail);
       if (res.success) {
         setOtpSuccessMsg(res.message);
         setAuthMode('verify_otp');
         setOtpCode('');
+      } else {
+        setError(res.message);
+      }
+    } catch (err: any) {
+      setError(getFriendlyErrorMessage(err));
+    } finally {
+      setOtpLoading(false);
+    }
+  };
+
+  const handleVerifyOtpOnly = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!otpCode.trim() || otpCode.trim().length !== 6) {
+      setError('Please enter a valid 6-digit OTP code.');
+      return;
+    }
+    setError('');
+    setOtpSuccessMsg('');
+    setOtpLoading(true);
+
+    try {
+      await new Promise(resolve => setTimeout(resolve, 500));
+      const res = await verifyOtpOnly(recoveryEmail, otpCode.trim());
+      if (res.success) {
+        setOtpSuccessMsg('OTP code confirmed! Now enter your new password.');
+        setAuthMode('new_password');
         setNewPassword('');
+        setConfirmPassword('');
       } else {
         setError(res.message);
       }
@@ -82,12 +107,16 @@ export const AuthView: React.FC<{ onBack: () => void; onGoToWorkspace?: () => vo
 
   const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!recoveryEmail || !otpCode.trim() || !newPassword.trim()) {
-      setError('Please fill out all fields.');
+    if (!newPassword.trim() || !confirmPassword.trim()) {
+      setError('Please fill out both password fields.');
       return;
     }
     if (newPassword.length < 6) {
       setError('New password must be at least 6 characters.');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setError('Passwords do not match.');
       return;
     }
     setError('');
@@ -95,7 +124,6 @@ export const AuthView: React.FC<{ onBack: () => void; onGoToWorkspace?: () => vo
     setOtpLoading(true);
 
     try {
-      // Scale Throttle Delay Simulation
       await new Promise(resolve => setTimeout(resolve, 800));
       const res = await verifyOtpAndSetPassword(recoveryEmail, otpCode, newPassword);
       if (res.success) {
@@ -129,49 +157,14 @@ export const AuthView: React.FC<{ onBack: () => void; onGoToWorkspace?: () => vo
     }
   }, [error]);
 
-  const handleSendMagicLink = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!email || !email.includes('@')) {
-      setError('Please enter a valid email address.');
-      return;
-    }
-    setError('');
-    setMagicLinkLoading(true);
-    try {
-      const res = await sendMagicLink(email);
-      setMagicLinkSent(true);
-      setMagicLinkMessage(res.message);
-    } catch (err: any) {
-      setError(getFriendlyErrorMessage(err));
-    } finally {
-      setMagicLinkLoading(false);
-    }
-  };
-
-  const handleVerifyMagicLinkSimulation = async () => {
-    setError('');
-    setLoading(true);
-    try {
-      await signInWithEmail(email, "magic-pwd-123");
-      setUseMagicLink(false);
-      setMagicLinkSent(false);
-    } catch (err: any) {
-      setError(getFriendlyErrorMessage(err));
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleSignOut = async () => {
     try {
       await signOutUser();
       onBack(); // Redirect to landing page
     } catch (err) {
-      console.error(err);
+      // Handled silently
     }
   };
-
-
 
   const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -183,7 +176,8 @@ export const AuthView: React.FC<{ onBack: () => void; onGoToWorkspace?: () => vo
       setError('Password must be at least 6 characters long.');
       return;
     }
-    if (!agreedToTerms && !isAuthenticated) {
+    // Only require agreeing to terms when SIGNING UP
+    if (isSignUp && !agreedToTerms) {
       setError('Please agree to the Terms of Service and Privacy Policy to continue.');
       return;
     }
@@ -391,9 +385,9 @@ export const AuthView: React.FC<{ onBack: () => void; onGoToWorkspace?: () => vo
                       type="button"
                       onClick={handleGoogleAuth}
                       disabled={loading}
-                      className="w-full flex items-center justify-center gap-2.5 px-4 py-3.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-semibold rounded-xl shadow-xs transition-colors duration-200 cursor-pointer disabled:opacity-50"
+                      className="w-full flex items-center justify-center gap-3 px-5 py-4 bg-white border border-slate-200 hover:bg-slate-50 text-slate-800 text-sm sm:text-base font-bold rounded-2xl shadow-xs transition-colors duration-200 cursor-pointer disabled:opacity-50 min-h-[50px]"
                     >
-                      <svg className="w-4.5 h-4.5" viewBox="0 0 24 24">
+                      <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24">
                         <path
                           fill="#4285F4"
                           d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
@@ -411,7 +405,7 @@ export const AuthView: React.FC<{ onBack: () => void; onGoToWorkspace?: () => vo
                           d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
                         />
                       </svg>
-                      <span className="font-sans text-xs">Continue with Google</span>
+                      <span className="font-sans">Continue with Google</span>
                     </button>
                   </div>
 
@@ -422,170 +416,124 @@ export const AuthView: React.FC<{ onBack: () => void; onGoToWorkspace?: () => vo
                     <div className="flex-grow border-t border-slate-205"></div>
                   </div>
 
-                  {/* Dynamic Credential Forms */}
-                  {useMagicLink ? (
-                    <form onSubmit={handleSendMagicLink} className="space-y-5">
-                      <div className="space-y-1 text-left">
-                        <span className="text-[10px] font-mono font-bold tracking-wider text-[#365345] uppercase block">Passwordless Access Link</span>
-                        <h4 className="font-serif text-lg font-bold text-[#203d36]">Authorize with Magic Link</h4>
-                        <p className="text-xs text-[#5c6e66] leading-relaxed">
-                          Input your email below. We will send a secure verification link that grants entry. Once verified, you will be directed straight to your garden.
-                        </p>
-                      </div>
+                  {/* Credential Form */}
+                  <form onSubmit={handleEmailAuth} className="space-y-5 text-left">
+                    
+                    {/* Email Field */}
+                    <div className="space-y-1.5">
+                      <label className="text-[11px] font-medium text-[#5c6e66] font-sans block">Email address</label>
+                      <input
+                        type="email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        placeholder="example@synapze.io"
+                        className="w-full py-3 px-4 block border border-slate-205 bg-[#f6f5f0]/40 focus:bg-white text-[#203d36] text-sm focus:outline-none focus:border-[#203d36] rounded-xl transition-all duration-200 placeholder-[#b5bdba] font-medium"
+                        required
+                        disabled={loading}
+                      />
+                    </div>
 
-                      <div className="space-y-1.5 text-left">
-                        <label className="text-[11px] font-medium text-[#5c6e66] font-sans block">Email address</label>
-                        <input
-                          type="email"
-                          value={email}
-                          onChange={(e) => setEmail(e.target.value)}
-                          placeholder="example@synapze.io"
-                          className="w-full py-3 px-4 block border border-slate-205 bg-[#f6f5f0]/40 focus:bg-white text-[#203d36] text-sm focus:outline-none focus:border-[#203d36] rounded-xl transition-all duration-200 placeholder-[#b5bdba] font-medium"
-                          required
-                          disabled={magicLinkLoading}
-                        />
-                      </div>
-
-                      {magicLinkSent && (
-                        <div className="p-4 bg-emerald-50 border border-emerald-100 rounded-2xl text-emerald-800 text-xs leading-relaxed space-y-3 text-left">
-                          <p className="font-bold">✉️ Magic confirmation link sent!</p>
-                          <p>{magicLinkMessage}</p>
-                          <button
-                            type="button"
-                            onClick={handleVerifyMagicLinkSimulation}
-                            className="w-full py-2 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold rounded-lg transition-colors cursor-pointer shadow-sm"
-                          >
-                            Verify Link & Access Garden Workspace
-                          </button>
-                        </div>
-                      )}
-
-                      <div className="flex gap-3 pt-2">
-                        <button
+                    {/* Password Field with reveal toggle & forget link */}
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <label className="text-[11px] font-medium text-[#5c6e66] font-sans">Password</label>
+                        <button 
                           type="button"
                           onClick={() => {
-                            setUseMagicLink(false);
-                            setMagicLinkSent(false);
+                            setRecoveryEmail(email);
+                            setError('');
+                            setOtpSuccessMsg('');
+                            setAuthMode('forgot_password');
                           }}
-                          className="w-1/3 py-3 border border-slate-200 text-[#5c6e66] hover:bg-slate-50 font-semibold text-xs rounded-xl transition-all duration-200 cursor-pointer"
+                          className="text-[11px] text-[#5c6e66] hover:text-[#203d36] font-semibold transition-colors cursor-pointer"
                         >
-                          Use Password
-                        </button>
-                        <button
-                          type="submit"
-                          disabled={magicLinkLoading}
-                          className="w-2/3 py-3 bg-[#365345] hover:bg-[#203d36] text-white font-semibold text-xs rounded-xl transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer duration-200"
-                        >
-                          {magicLinkLoading ? (
-                            <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                          ) : (
-                            <span>Send Magic Link</span>
-                          )}
+                          Forgot password?
                         </button>
                       </div>
-                    </form>
-                  ) : (
-                    <form onSubmit={handleEmailAuth} className="space-y-5">
-                      
-                      {/* Email Field with Magic link indicator */}
-                      <div className="space-y-1.5">
-                        <div className="flex items-center justify-between">
-                          <label className="text-[11px] font-medium text-[#5c6e66] font-sans">Email address</label>
-                          <button 
-                            type="button"
-                            onClick={() => setUseMagicLink(true)}
-                            className="text-[11px] text-[#5c6e66] hover:text-[#203d36] font-bold underline decoration-dotted transition-colors"
-                          >
-                            Use Magic Link
-                          </button>
-                        </div>
-                        
+
+                      <div className="relative">
                         <input
-                          type="email"
-                          value={email}
-                          onChange={(e) => setEmail(e.target.value)}
-                          placeholder="example@synapze.io"
-                          className="w-full py-3 px-4 block border border-slate-205 bg-[#f6f5f0]/40 focus:bg-white text-[#203d36] text-sm focus:outline-none focus:border-[#203d36] rounded-xl transition-all duration-200 placeholder-[#b5bdba] font-medium"
+                          type={showPassword ? "text" : "password"}
+                          value={password}
+                          onChange={(e) => setPassword(e.target.value)}
+                          placeholder="••••••••"
+                          className="w-full py-3 pl-4 pr-11 block border border-slate-205 bg-[#f6f5f0]/40 focus:bg-white text-[#203d36] text-sm focus:outline-none focus:border-[#203d36] rounded-xl transition-all duration-200 placeholder-[#b5bdba] font-medium"
                           required
                           disabled={loading}
                         />
-                      </div>
 
-                      {/* Password Field with reveal toggle & forget link */}
-                      <div className="space-y-1.5">
-                        <div className="flex items-center justify-between">
-                          <label className="text-[11px] font-medium text-[#5c6e66] font-sans">Password</label>
-                          <button 
-                            type="button"
-                            onClick={() => {
-                              setRecoveryEmail(email);
-                              setError('');
-                              setOtpSuccessMsg('');
-                              setAuthMode('forgot_password');
-                            }}
-                            className="text-[11px] text-[#5c6e66] hover:text-[#203d36] font-semibold transition-colors cursor-pointer"
-                          >
-                            Forgot password?
-                          </button>
-                        </div>
-
-                        <div className="relative">
-                          <input
-                            type={showPassword ? "text" : "password"}
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                            placeholder="••••••••"
-                            className="w-full py-3 pl-4 pr-11 block border border-slate-205 bg-[#f6f5f0]/40 focus:bg-white text-[#203d36] text-sm focus:outline-none focus:border-[#203d36] rounded-xl transition-all duration-200 placeholder-[#b5bdba] font-medium"
-                            required
-                            disabled={loading}
-                          />
-
-                          {/* Show password button */}
-                          <button
-                            type="button"
-                            onClick={() => setShowPassword(p => !p)}
-                            className="absolute right-4.5 top-1/2 -translate-y-1/2 text-[#5c6e66] hover:text-[#203d36] transition-colors"
-                          >
-                            {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* Custom Elegant Accept Terms Checkbox */}
-                      <div 
-                        onClick={() => setAgreedToTerms(prev => !prev)}
-                        className="flex items-start gap-3 cursor-pointer select-none group"
-                      >
-                        <div className={`mt-0.5 w-[18px] h-[18px] rounded border transition-all flex items-center justify-center shrink-0 ${
-                          agreedToTerms 
-                            ? 'bg-[#365345] border-[#365345]' 
-                            : 'border-slate-300 bg-white group-hover:border-slate-400'
-                        }`}>
-                          {agreedToTerms && <Check className="w-3 h-3 text-white stroke-[3.5px]" />}
-                        </div>
-                        
-                        <span className="text-[11px] text-[#5c6e66] font-medium leading-relaxed font-sans">
-                          I agree to the Terms of Service and Privacy Policy
-                        </span>
-                      </div>
-
-                      {/* Primary Action Submit button */}
-                      <div className="pt-2">
+                        {/* Show password button */}
                         <button
-                          type="submit"
-                          disabled={loading}
-                          className="w-full py-3.5 bg-[#365345] hover:bg-[#203d36] text-[#faf9f6]/95 font-semibold text-sm rounded-xl transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer duration-200"
+                          type="button"
+                          onClick={() => setShowPassword(p => !p)}
+                          className="absolute right-4.5 top-1/2 -translate-y-1/2 text-[#5c6e66] hover:text-[#203d36] transition-colors cursor-pointer"
                         >
-                          {loading ? (
-                            <span className="w-4.5 h-4.5 border-2 border-[#faf9f6] border-t-transparent rounded-full animate-spin" />
-                          ) : (
-                            <span>{isSignUp ? 'Register Sprout Profile' : 'Enter Terminal'}</span>
-                          )}
+                          {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                         </button>
                       </div>
+                    </div>
 
-                    </form>
-                  )}
+                    {/* Terms & Privacy Checkbox (ONLY shown when registering / Sign Up) */}
+                    {isSignUp && (
+                      <div className="space-y-1.5 pt-1">
+                        <div 
+                          onClick={() => setAgreedToTerms(prev => !prev)}
+                          className="flex items-start gap-3 cursor-pointer select-none group"
+                        >
+                          <div className={`mt-0.5 w-[18px] h-[18px] rounded border transition-all flex items-center justify-center shrink-0 ${
+                            agreedToTerms 
+                              ? 'bg-[#365345] border-[#365345]' 
+                              : 'border-slate-300 bg-white group-hover:border-slate-400'
+                          }`}>
+                            {agreedToTerms && <Check className="w-3 h-3 text-white stroke-[3.5px]" />}
+                          </div>
+                          
+                          <span className="text-[11px] text-[#5c6e66] font-medium leading-relaxed font-sans">
+                            I agree to the{' '}
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onNavigateToLegal?.('terms');
+                              }}
+                              className="font-bold underline text-[#203d36] hover:text-[#365345] cursor-pointer"
+                            >
+                              Terms of Service
+                            </button>
+                            {' '}and{' '}
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onNavigateToLegal?.('privacy');
+                              }}
+                              className="font-bold underline text-[#203d36] hover:text-[#365345] cursor-pointer"
+                            >
+                              Privacy Policy
+                            </button>
+                          </span>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Primary Action Submit button */}
+                    <div className="pt-2">
+                      <button
+                        type="submit"
+                        disabled={loading || (isSignUp && !agreedToTerms)}
+                        className={`w-full py-4 px-6 bg-[#365345] hover:bg-[#203d36] text-[#faf9f6]/95 font-bold text-base rounded-2xl transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer duration-200 min-h-[52px] ${
+                          isSignUp && !agreedToTerms ? 'opacity-50 cursor-not-allowed' : ''
+                        }`}
+                      >
+                        {loading ? (
+                          <span className="w-5 h-5 border-2 border-[#faf9f6] border-t-transparent rounded-full animate-spin" />
+                        ) : (
+                          <span>{isSignUp ? 'Register Sprout Profile' : 'Enter Terminal'}</span>
+                        )}
+                      </button>
+                    </div>
+
+                  </form>
                 </>
               )}
 
@@ -640,56 +588,29 @@ export const AuthView: React.FC<{ onBack: () => void; onGoToWorkspace?: () => vo
               )}
 
               {authMode === 'verify_otp' && (
-                <form onSubmit={handleResetPassword} className="space-y-5 text-left bg-white p-5 border border-slate-200/60 rounded-2xl shadow-xs">
+                <form onSubmit={handleVerifyOtpOnly} className="space-y-5 text-left bg-white p-5 border border-slate-200/60 rounded-2xl shadow-xs">
                   <div className="space-y-1">
-                    <h3 className="font-serif text-base font-bold text-[#203d36]">Verify Access Code</h3>
+                    <h3 className="font-serif text-base font-bold text-[#203d36]">Enter OTP Verification Code</h3>
                     <p className="text-xs text-[#5c6e66] leading-relaxed">
-                      A recovery code has been broadcasted. Input the 6-digit code and configure your replacement master password.
+                      Enter the 6-digit code sent to <strong className="text-slate-800">{recoveryEmail}</strong>.
                     </p>
                   </div>
 
-                  <div className="space-y-4">
-                    <div className="space-y-1.5">
-                      <label className="text-[11px] font-medium text-[#5c6e66]">Gardener Email</label>
-                      <input
-                        type="email"
-                        value={recoveryEmail}
-                        onChange={(e) => setRecoveryEmail(e.target.value)}
-                        placeholder="example@synapze.io"
-                        className="w-full py-2.5 px-3 block border border-slate-205 bg-[#f6f5f0]/40 focus:bg-white text-[#203d36] text-xs focus:outline-none focus:border-[#203d36] rounded-xl transition-all placeholder-[#b5bdba]"
-                        required
-                        disabled={otpLoading}
-                      />
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div className="space-y-1.5">
-                        <label className="text-[11px] font-medium text-[#5c6e66]">6-Digit Recovery OTP</label>
-                        <input
-                          type="text"
-                          maxLength={6}
-                          value={otpCode}
-                          onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ''))}
-                          placeholder="000000"
-                          className="w-full py-3 px-4 block border border-slate-250 bg-white text-[#203d36] text-base font-bold text-center tracking-widest focus:outline-none focus:border-[#203d36] rounded-xl placeholder-slate-300"
-                          required
-                          disabled={otpLoading}
-                        />
-                      </div>
-
-                      <div className="space-y-1.5">
-                        <label className="text-[11px] font-medium text-[#5c6e66]">New Master Password</label>
-                        <input
-                          type="password"
-                          value={newPassword}
-                          onChange={(e) => setNewPassword(e.target.value)}
-                          placeholder="Min 6 characters"
-                          className="w-full py-3 px-4 block border border-slate-205 bg-white text-[#203d36] text-sm focus:outline-none focus:border-[#203d36] rounded-xl placeholder-[#b5bdba]"
-                          required
-                          disabled={otpLoading}
-                        />
-                      </div>
-                    </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] font-medium text-[#5c6e66]">6-Digit Recovery OTP</label>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      maxLength={6}
+                      value={otpCode}
+                      onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ''))}
+                      placeholder="000000"
+                      className="w-full py-3.5 px-4 block border border-slate-300 bg-slate-50 focus:bg-white text-[#203d36] text-xl font-bold font-mono text-center tracking-[0.3em] focus:outline-none focus:border-[#203d36] rounded-xl placeholder-slate-300 min-h-[44px]"
+                      required
+                      disabled={otpLoading}
+                      autoFocus
+                    />
                   </div>
 
                   <div className="pt-2 flex flex-col sm:flex-row gap-3">
@@ -700,20 +621,86 @@ export const AuthView: React.FC<{ onBack: () => void; onGoToWorkspace?: () => vo
                         setOtpSuccessMsg('');
                         setAuthMode('forgot_password');
                       }}
-                      className="w-full sm:w-1/3 py-3 border border-slate-200 text-slate-600 bg-white hover:bg-slate-50 font-semibold text-xs rounded-xl transition-all duration-200 cursor-pointer text-center"
+                      className="w-full sm:w-1/3 py-3 border border-slate-200 text-slate-600 bg-white hover:bg-slate-50 font-semibold text-xs rounded-xl transition-all duration-200 cursor-pointer text-center min-h-[44px]"
                     >
-                      Back to Send
+                      Back
                     </button>
 
                     <button
                       type="submit"
-                      disabled={otpLoading}
-                      className="w-full sm:w-2/3 py-3 bg-emerald-700 hover:bg-emerald-800 text-white font-semibold text-xs rounded-xl transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer duration-200"
+                      disabled={otpLoading || otpCode.length !== 6}
+                      className="w-full sm:w-2/3 py-3 bg-[#365345] hover:bg-[#203d36] disabled:bg-slate-300 text-white font-semibold text-xs rounded-xl transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer duration-200 min-h-[44px]"
                     >
                       {otpLoading ? (
                         <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                       ) : (
-                        <span>Verify & Set Password</span>
+                        <span>Confirm OTP</span>
+                      )}
+                    </button>
+                  </div>
+                </form>
+              )}
+
+              {authMode === 'new_password' && (
+                <form onSubmit={handleResetPassword} className="space-y-5 text-left bg-white p-5 border border-slate-200/60 rounded-2xl shadow-xs">
+                  <div className="space-y-1">
+                    <h3 className="font-serif text-base font-bold text-[#203d36]">Set New Master Password</h3>
+                    <p className="text-xs text-[#5c6e66] leading-relaxed">
+                      OTP verified! Please create your new secure password.
+                    </p>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div className="space-y-1.5">
+                      <label className="text-[11px] font-medium text-[#5c6e66]">New Password</label>
+                      <input
+                        type="password"
+                        value={newPassword}
+                        onChange={(e) => setNewPassword(e.target.value)}
+                        placeholder="Minimum 6 characters"
+                        className="w-full py-3 px-4 block border border-slate-200 bg-white text-[#203d36] text-base focus:outline-none focus:border-[#203d36] rounded-xl placeholder-slate-400 font-medium min-h-[44px]"
+                        required
+                        disabled={otpLoading}
+                        autoFocus
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-[11px] font-medium text-[#5c6e66]">Confirm New Password</label>
+                      <input
+                        type="password"
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        placeholder="Re-enter new password"
+                        className="w-full py-3 px-4 block border border-slate-200 bg-white text-[#203d36] text-base focus:outline-none focus:border-[#203d36] rounded-xl placeholder-slate-400 font-medium min-h-[44px]"
+                        required
+                        disabled={otpLoading}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="pt-2 flex flex-col sm:flex-row gap-3">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setError('');
+                        setOtpSuccessMsg('');
+                        setAuthMode('verify_otp');
+                      }}
+                      className="w-full sm:w-1/3 py-3 border border-slate-200 text-slate-600 bg-white hover:bg-slate-50 font-semibold text-xs rounded-xl transition-all duration-200 cursor-pointer text-center min-h-[44px]"
+                    >
+                      Back to OTP
+                    </button>
+
+                    <button
+                      type="submit"
+                      disabled={otpLoading || !newPassword || !confirmPassword}
+                      className="w-full sm:w-2/3 py-3 bg-[#365345] hover:bg-[#203d36] disabled:bg-slate-300 text-white font-semibold text-xs rounded-xl transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer duration-200 min-h-[44px]"
+                    >
+                      {otpLoading ? (
+                        <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      ) : (
+                        <span>Save Password & Sign In</span>
                       )}
                     </button>
                   </div>

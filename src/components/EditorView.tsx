@@ -58,6 +58,7 @@ export const EditorView: React.FC<EditorViewProps> = ({ activeSeedlingId, onBack
 
   // Ref to prevent reloading innerHTML and losing cursor caret position during editing
   const lastLoadedIdRef = useRef<string | null>(undefined);
+  const titleInputRef = useRef<HTMLInputElement>(null);
 
   // Core state for active note
   const [title, setTitle] = useState('');
@@ -70,12 +71,6 @@ export const EditorView: React.FC<EditorViewProps> = ({ activeSeedlingId, onBack
   // Drag and drop states & file input ref
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  // Companion Botanist Sidebar Chat
-  const [isCompanionOpen, setIsCompanionOpen] = useState(false);
-  const [companionTips, setCompanionTips] = useState<string>('');
-  const [isLoadingTips, setIsLoadingTips] = useState(false);
-  const [isRewritingMode, setIsRewritingMode] = useState<'friendly' | 'humanize' | 'professional' | 'poetic' | null>(null);
 
   // Tracks if there are unsaved edits
   const [isDirty, setIsDirty] = useState(false);
@@ -97,7 +92,7 @@ export const EditorView: React.FC<EditorViewProps> = ({ activeSeedlingId, onBack
     };
   }, [isDeleteModalOpen]);
 
-  // Load / Setup current note data
+  // Load / Setup current note data & auto-focus title
   useEffect(() => {
     if (lastLoadedIdRef.current !== activeSeedlingId) {
       lastLoadedIdRef.current = activeSeedlingId;
@@ -134,6 +129,11 @@ export const EditorView: React.FC<EditorViewProps> = ({ activeSeedlingId, onBack
           editorRef.current.innerHTML = starterHtml;
         }
       }
+
+      // Automatically focus title input when opening or creating a note
+      setTimeout(() => {
+        titleInputRef.current?.focus();
+      }, 100);
     }
   }, [activeSeedlingId, seedlings]);
 
@@ -1086,149 +1086,6 @@ export const EditorView: React.FC<EditorViewProps> = ({ activeSeedlingId, onBack
     reader.readAsDataURL(file);
   };
 
-  // Companion AI review trigger
-  const askBotanistAdvice = async () => {
-    setIsCompanionOpen(true);
-    setIsLoadingTips(true);
-    setCompanionTips('');
-
-    // Extract clean human text from contentEditable div
-    const textContext = editorRef.current ? editorRef.current.innerText : content.replace(/<[^>]*>/g, ' ');
-
-    try {
-      const response = await fetch('/api/gemini', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title,
-          content: textContext,
-          tags: tagsInput,
-          companionName: profile.companionName || "Sprouty"
-        })
-      });
-
-      if (!response.ok) {
-        throw new Error('Server Gemini request failed');
-      }
-
-      const data = await response.json();
-      setCompanionTips(data.advice || `Your thoughts are structured wonderfully. Keep recording sub-goals and nurturing tags to gain experience.`);
-    } catch (error) {
-      console.warn("Proxy advisor failed. Triggering client-side botanic heuristics advice:", error);
-      setTimeout(() => {
-        setCompanionTips(
-          `### 🌿 ${profile.companionName || "Sprouty"}'s Advice:\n\n` +
-          "1. **Decompose Action Items**: I noticed some outstanding steps! Highlight them, set to striking task checklist items, and plant milestones to maximize your gardening streak.\n" +
-          "2. **Cluster Specific Tags**: Using rich tags like `composting`, `ideas`, and `sprint` triggers stronger botanical matches across your archive!\n" +
-          "3. **Add Rich Media**: Drag and drop visual mockups directly on the sheet to anchor memory associations."
-        );
-      }, 1000);
-    } finally {
-      setIsLoadingTips(false);
-    }
-  };
-
-  const cleanAiRewrite = (text: string): string => {
-    let cleaned = text.trim();
-    if (cleaned.startsWith('"') && cleaned.endsWith('"')) {
-      cleaned = cleaned.slice(1, -1).trim();
-    } else if (cleaned.startsWith('`') && cleaned.endsWith('`')) {
-      cleaned = cleaned.slice(1, -1).trim();
-    }
-    
-    const introPatterns = [
-      /^(here\s+is\s+the\s+(friendly|humanized|professional|poetic|rewritten)\s+version(\s+of\s+your\s+note)?:?)/i,
-      /^(here\s+is\s+your\s+rewritten\s+note:?)/i,
-      /^(here\s+is\s+a\s+(friendly|humanized|professional|poetic)\s+version:?)/i,
-      /^(sure,\s+here\s+is\s+the\s+(friendly|humanized|professional|poetic)\s+version:?)/i,
-      /^(certainly!\s+here\s+is\s+the\s+rewritten\s+text:?)/i,
-      /^(certainly!\s+here\s+is\s+your\s+note:?)/i,
-      /^(sure,\s+here's\s+the\s+rewritten\s+text:?)/i,
-      /^(sure!\s+here's\s+a\s+(friendly|humanized|professional|poetic)\s+version:?)/i,
-      /^(here's\s+the\s+(friendly|humanized|professional|poetic)\s+version:?)/i,
-      /^(here\s+is\s+the\s+note\s+rewritten:?)/i,
-      /^(as\s+requested,\s+here\s+is\s+the\s+rewritten\s+text:?)/i,
-      /^(rewritten\s+version:?)/i,
-      /^(friendly\s+version:?)/i,
-      /^(professional\s+version:?)/i,
-      /^(poetic\s+version:?)/i,
-      /^(humanized\s+version:?)/i
-    ];
-    
-    let matchFound = true;
-    while (matchFound) {
-      matchFound = false;
-      for (const pattern of introPatterns) {
-        if (pattern.test(cleaned)) {
-          cleaned = cleaned.replace(pattern, '').trim();
-          matchFound = true;
-        }
-      }
-    }
-    
-    if (cleaned.startsWith('```')) {
-      const lines = cleaned.split('\n');
-      if (lines[0].startsWith('```')) {
-        lines.shift();
-      }
-      if (lines[lines.length - 1].startsWith('```')) {
-        lines.pop();
-      }
-      cleaned = lines.join('\n').trim();
-    }
-    
-    return cleaned;
-  };
-
-  // Companion AI rewrite/expression trigger
-  const rewriteContentExpression = async (mode: 'friendly' | 'humanize' | 'professional' | 'poetic') => {
-    setIsRewritingMode(mode);
-    
-    // Extract clean human text from contentEditable div
-    const textContext = editorRef.current ? editorRef.current.innerText : content.replace(/<[^>]*>/g, ' ');
-
-    try {
-      const response = await fetch('/api/gemini', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title,
-          content: textContext,
-          tags: tagsInput,
-          companionName: profile.companionName || "Sprouty",
-          mode
-        })
-      });
-
-      if (!response.ok) {
-        throw new Error('Server Gemini rewrite failed');
-      }
-
-      const data = await response.json();
-      const rawRewrittenResult = data.rewritten;
-      
-      if (rawRewrittenResult) {
-        const rewrittenResult = cleanAiRewrite(rawRewrittenResult);
-        // Update both local react state and contentEditable innerHTML
-        const paragraphs = rewrittenResult.split('\n\n').map((p: string) => `<p>${p.replace(/\n/g, '<br/>')}</p>`).join('');
-        setContent(paragraphs);
-        if (editorRef.current) {
-          editorRef.current.innerHTML = paragraphs;
-        }
-        setIsDirty(true);
-        triggerPushNotification(
-          `Expressed: ${mode.toUpperCase()}`,
-          `Rewritten in ${mode} style.`,
-          'system'
-        );
-      }
-    } catch (error) {
-      console.warn("Proxy rewrite failed:", error);
-    } finally {
-      setIsRewritingMode(null);
-    }
-  };
-
   return (
     <div className="flex-1 h-full min-h-[calc(100vh-73px)] flex flex-col bg-white relative">
       <style>{`
@@ -1332,19 +1189,19 @@ export const EditorView: React.FC<EditorViewProps> = ({ activeSeedlingId, onBack
           {(activeSeedlingId || localActiveId) && (
             <button
               onClick={handleDelete}
-              className="p-2 text-rose-500 hover:text-rose-700 rounded-xl hover:bg-rose-50 transition-colors cursor-pointer"
+              className="p-2.5 text-rose-500 hover:text-rose-700 rounded-xl hover:bg-rose-50 transition-colors cursor-pointer min-h-[44px] min-w-[44px] flex items-center justify-center"
               title="Delete Seedling"
             >
-              <Trash2 className="w-4 h-4" />
+              <Trash2 className="w-4.5 h-4.5" />
             </button>
           )}
           
           <button
             onClick={handleSave}
             id="btn_editor_save"
-            className="px-4 py-2 bg-[#203d36] hover:bg-[#162e29] text-white rounded-xl text-xs font-semibold flex items-center gap-1.5 shadow-sm transition-colors cursor-pointer"
+            className="px-4 py-2.5 sm:py-3 bg-[#203d36] hover:bg-[#162e29] active:bg-[#0f211d] text-white rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 shadow-sm transition-colors cursor-pointer min-h-[44px]"
           >
-            <Save className="w-3.5 h-3.5" />
+            <Save className="w-4 h-4" />
             Save Changes
           </button>
         </div>
@@ -1362,11 +1219,28 @@ export const EditorView: React.FC<EditorViewProps> = ({ activeSeedlingId, onBack
             
             {/* Title formulation input */}
             <input
+              ref={titleInputRef}
               type="text"
               value={title}
               onChange={(e) => handleTitleChange(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  if (editorRef.current) {
+                    editorRef.current.focus();
+                    const selection = window.getSelection();
+                    if (selection && editorRef.current.childNodes.length > 0) {
+                      const range = document.createRange();
+                      range.selectNodeContents(editorRef.current);
+                      range.collapse(true);
+                      selection.removeAllRanges();
+                      selection.addRange(range);
+                    }
+                  }
+                }
+              }}
               placeholder="Sow seed title..."
-              className="font-serif font-bold text-2xl md:text-3xl text-[#203d36] focus:outline-hidden w-full border-b border-dashed border-slate-200/60 pb-3 placeholder:text-slate-200 transition-all text-left animate-fade-in"
+              className="font-serif font-bold text-2xl md:text-3xl text-[#203d36] focus:outline-hidden w-full border-b border-dashed border-slate-200/60 pb-3 placeholder:text-slate-300 transition-all text-left animate-fade-in"
             />
 
             {/* Tags and Status settings rail */}
@@ -1394,10 +1268,10 @@ export const EditorView: React.FC<EditorViewProps> = ({ activeSeedlingId, onBack
                     setIsTask(!isTask);
                     setIsDirty(true);
                   }}
-                  className={`px-3 py-1 rounded-lg border text-[11px] font-sans font-semibold transition-all flex items-center gap-1.5 cursor-pointer select-none ${
+                  className={`px-3.5 py-2 rounded-xl border text-xs sm:text-sm font-sans font-bold transition-all flex items-center gap-2 cursor-pointer select-none min-h-[44px] ${
                     isTask
-                      ? 'bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100'
-                      : 'bg-sky-50 border-sky-200 text-sky-700 hover:bg-sky-100'
+                      ? 'bg-emerald-50 border-emerald-300 text-emerald-800 hover:bg-emerald-100 shadow-xs'
+                      : 'bg-sky-50 border-sky-300 text-sky-800 hover:bg-sky-100 shadow-xs'
                   }`}
                 >
                   {isTask ? '📋 Todo / Task' : '📝 Regular Note'}
@@ -1452,40 +1326,12 @@ export const EditorView: React.FC<EditorViewProps> = ({ activeSeedlingId, onBack
             </div>
 
             {/* Visual Formatting Toolbar */}
-            <div className="sticky top-0 z-10 bg-white/95 backdrop-blur-md border-b border-slate-100 py-3 mb-6 flex flex-wrap items-center gap-1">
-              {/* Type blocks */}
-              <button
-                type="button"
-                onClick={() => formatBlock('<h1>')}
-                className="p-1.5 hover:bg-slate-100 text-slate-600 hover:text-slate-900 rounded-lg transition-colors cursor-pointer"
-                title="Heading 1"
-              >
-                <Heading1 className="w-4 h-4" />
-              </button>
-              <button
-                type="button"
-                onClick={() => formatBlock('<h2>')}
-                className="p-1.5 hover:bg-slate-100 text-slate-600 hover:text-slate-900 rounded-lg transition-colors cursor-pointer"
-                title="Heading 2"
-              >
-                <Heading2 className="w-4 h-4" />
-              </button>
-              <button
-                type="button"
-                onClick={() => formatBlock('<p>')}
-                className="p-1.5 hover:bg-slate-100 text-slate-600 hover:text-slate-900 rounded-lg transition-colors cursor-pointer"
-                title="Normal Paragraph"
-              >
-                <Type className="w-4 h-4" />
-              </button>
-
-              <div className="w-[1px] h-5 bg-slate-200 mx-1.5" />
-
+            <div className="sticky top-0 z-10 bg-white/95 backdrop-blur-md border-b border-slate-100 py-2.5 mb-5 flex flex-wrap items-center gap-1 sm:gap-1.5">
               {/* Inline layout styles */}
               <button
                 type="button"
                 onClick={() => format('bold')}
-                className="p-1.5 hover:bg-slate-100 text-slate-600 hover:text-slate-900 rounded-lg transition-colors cursor-pointer"
+                className="p-2 hover:bg-slate-100 text-slate-700 hover:text-slate-900 rounded-lg transition-colors cursor-pointer"
                 title="Bold"
               >
                 <Bold className="w-4 h-4 font-bold" />
@@ -1493,7 +1339,7 @@ export const EditorView: React.FC<EditorViewProps> = ({ activeSeedlingId, onBack
               <button
                 type="button"
                 onClick={() => format('italic')}
-                className="p-1.5 hover:bg-slate-100 text-slate-600 hover:text-slate-900 rounded-lg transition-colors cursor-pointer"
+                className="p-2 hover:bg-slate-100 text-slate-700 hover:text-slate-900 rounded-lg transition-colors cursor-pointer"
                 title="Italic"
               >
                 <Italic className="w-4 h-4" />
@@ -1501,7 +1347,7 @@ export const EditorView: React.FC<EditorViewProps> = ({ activeSeedlingId, onBack
               <button
                 type="button"
                 onClick={() => format('underline')}
-                className="p-1.5 hover:bg-slate-100 text-slate-600 hover:text-slate-900 rounded-lg transition-colors cursor-pointer"
+                className="p-2 hover:bg-slate-100 text-slate-700 hover:text-slate-900 rounded-lg transition-colors cursor-pointer"
                 title="Underline"
               >
                 <Underline className="w-4 h-4" />
@@ -1509,19 +1355,19 @@ export const EditorView: React.FC<EditorViewProps> = ({ activeSeedlingId, onBack
               <button
                 type="button"
                 onClick={() => format('strikeThrough')}
-                className="p-1.5 hover:bg-slate-100 text-slate-600 hover:text-slate-900 rounded-lg transition-colors cursor-pointer"
+                className="p-2 hover:bg-slate-100 text-slate-700 hover:text-slate-900 rounded-lg transition-colors cursor-pointer"
                 title="Strikethrough"
               >
                 <Strikethrough className="w-4 h-4" />
               </button>
 
-              <div className="w-[1px] h-5 bg-slate-200 mx-1.5" />
+              <div className="w-[1px] h-5 bg-slate-200 mx-1" />
 
               {/* Lists and Quote blocks */}
               <button
                 type="button"
                 onClick={() => format('insertUnorderedList')}
-                className="p-1.5 hover:bg-slate-100 text-slate-600 hover:text-slate-900 rounded-lg transition-colors cursor-pointer"
+                className="p-2 hover:bg-slate-100 text-slate-700 hover:text-slate-900 rounded-lg transition-colors cursor-pointer"
                 title="Bullet List"
               >
                 <List className="w-4 h-4" />
@@ -1529,7 +1375,7 @@ export const EditorView: React.FC<EditorViewProps> = ({ activeSeedlingId, onBack
               <button
                 type="button"
                 onClick={() => format('insertOrderedList')}
-                className="p-1.5 hover:bg-slate-100 text-slate-600 hover:text-slate-900 rounded-lg transition-colors cursor-pointer"
+                className="p-2 hover:bg-slate-100 text-slate-700 hover:text-slate-900 rounded-lg transition-colors cursor-pointer"
                 title="Numbered List"
               >
                 <ListOrdered className="w-4 h-4" />
@@ -1537,19 +1383,19 @@ export const EditorView: React.FC<EditorViewProps> = ({ activeSeedlingId, onBack
               <button
                 type="button"
                 onClick={() => formatBlock('<blockquote>')}
-                className="p-1.5 hover:bg-slate-100 text-slate-600 hover:text-slate-900 rounded-lg transition-colors cursor-pointer"
+                className="p-2 hover:bg-slate-100 text-slate-700 hover:text-slate-900 rounded-lg transition-colors cursor-pointer"
                 title="Block Quote"
               >
                 <Quote className="w-4 h-4" />
               </button>
 
-              <div className="w-[1px] h-5 bg-slate-200 mx-1.5" />
+              <div className="w-[1px] h-5 bg-slate-200 mx-1" />
 
               {/* Task checkbox creator inside typography area */}
               <button
                 type="button"
                 onClick={insertTaskCheckbox}
-                className="p-1.5 hover:bg-slate-100 text-slate-600 hover:text-slate-900 rounded-lg transition-colors cursor-pointer"
+                className="p-2 hover:bg-slate-100 text-slate-700 hover:text-slate-900 rounded-lg transition-colors cursor-pointer"
                 title="Add Checkbox"
               >
                 <CheckSquare className="w-4 h-4" />
@@ -1559,7 +1405,7 @@ export const EditorView: React.FC<EditorViewProps> = ({ activeSeedlingId, onBack
               <button
                 type="button"
                 onClick={triggerFileInput}
-                className="p-1.5 hover:bg-slate-100 text-slate-600 hover:text-slate-900 rounded-lg transition-colors cursor-pointer ml-auto"
+                className="p-2 hover:bg-slate-100 text-slate-700 hover:text-slate-900 rounded-lg transition-colors cursor-pointer ml-auto"
                 title="Add Image Attachment"
               >
                 <ImageIcon className="w-4 h-4" />
@@ -1602,139 +1448,7 @@ export const EditorView: React.FC<EditorViewProps> = ({ activeSeedlingId, onBack
 
         </div>
 
-        {/* Companion Mascot Advice Sidebar */}
-        {isCompanionOpen && createPortal(
-          <div className="fixed bottom-6 right-6 w-80 md:w-96 max-w-[calc(100vw-32px)] h-[520px] max-h-[70vh] bg-slate-900 text-white z-50 shadow-2xl flex flex-col justify-between border border-slate-800 rounded-3xl overflow-hidden animate-fade-in">
-            
-            {/* Advice Header */}
-            <div className="p-4 border-b border-slate-800 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Sprout className="w-5 h-5 text-emerald-400" />
-                <span className="font-display font-bold text-sm tracking-tight text-emerald-400">{profile.companionName || "Sprouty"} the Botanist</span>
-              </div>
-              <button 
-                onClick={() => setIsCompanionOpen(false)}
-                className="p-1.5 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white transition-colors cursor-pointer"
-                title="Close Sidebar"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            {/* Tips panel context */}
-            <div className="flex-1 overflow-y-auto custom-scrollbar p-5 space-y-4 font-sans text-xs md:text-sm text-left">
-
-              {isLoadingTips ? (
-                <div className="flex flex-col items-center justify-center py-12 space-y-3">
-                  <RefreshCw className="w-6 h-6 text-emerald-400 animate-spin" />
-                  <span className="font-mono text-[10px] text-slate-500">EXAMINING_NOTE_SOIL...</span>
-                </div>
-              ) : companionTips ? (
-                <div className="p-4 bg-emerald-950/20 border border-emerald-950/80 text-slate-200 rounded-xl space-y-2 select-text font-sans">
-                  <div className="font-display font-semibold text-emerald-400 text-sm flex items-center gap-1.5">
-                    <Sparkles className="w-4 h-4 text-emerald-400" />
-                    Growth Recommendations
-                  </div>
-                  <div className="text-xs pt-2 text-slate-300 leading-relaxed whitespace-pre-wrap">
-                    {companionTips}
-                  </div>
-                </div>
-              ) : null}
-
-              {/* Expressions rewrite tool panel */}
-              <div className="pt-4 border-t border-slate-800/60 space-y-3">
-                <p className="font-mono text-[9px] text-emerald-500 uppercase tracking-wider font-bold">Garden Rewrite Expressions</p>
-                <div className="grid grid-cols-1 gap-2.5">
-                  <button
-                    onClick={() => rewriteContentExpression('friendly')}
-                    disabled={isLoadingTips || isRewritingMode !== null}
-                    className="w-full py-2.5 px-3 bg-slate-950/40 hover:bg-slate-950 border border-slate-800/60 rounded-xl text-left hover:border-emerald-500/40 transition-all text-[11px] font-semibold text-slate-200 flex items-center gap-2.5 cursor-pointer disabled:opacity-50"
-                  >
-                    <span className="text-base">{isRewritingMode === 'friendly' ? '⏳' : '😊'}</span>
-                    <div>
-                      <div className="font-bold text-slate-200">
-                        {isRewritingMode === 'friendly' ? 'Warmly Expressing...' : 'Make Friendly'}
-                      </div>
-                      <div className="text-[9px] text-slate-400 font-normal leading-normal">Rewrites warmly in your own words</div>
-                    </div>
-                  </button>
-
-                  <button
-                    onClick={() => rewriteContentExpression('humanize')}
-                    disabled={isLoadingTips || isRewritingMode !== null}
-                    className="w-full py-2.5 px-3 bg-slate-950/40 hover:bg-slate-950 border border-slate-800/60 rounded-xl text-left hover:border-emerald-500/40 transition-all text-[11px] font-semibold text-slate-200 flex items-center gap-2.5 cursor-pointer disabled:opacity-50"
-                  >
-                    <span className="text-base">{isRewritingMode === 'humanize' ? '⏳' : '🌿'}</span>
-                    <div>
-                      <div className="font-bold text-slate-200">
-                        {isRewritingMode === 'humanize' ? 'Humanizing Ideas...' : 'Humanize Expression'}
-                      </div>
-                      <div className="text-[9px] text-slate-400 font-normal leading-normal">Rewrites into authentic natural speech</div>
-                    </div>
-                  </button>
-
-                  <button
-                    onClick={() => rewriteContentExpression('professional')}
-                    disabled={isLoadingTips || isRewritingMode !== null}
-                    className="w-full py-2.5 px-3 bg-slate-950/40 hover:bg-slate-950 border border-slate-800/60 rounded-xl text-left hover:border-emerald-500/40 transition-all text-[11px] font-semibold text-slate-200 flex items-center gap-2.5 cursor-pointer disabled:opacity-50"
-                  >
-                    <span className="text-base">{isRewritingMode === 'professional' ? '⏳' : '💼'}</span>
-                    <div>
-                      <div className="font-bold text-slate-200">
-                        {isRewritingMode === 'professional' ? 'Polishing Note...' : 'Professional Polish'}
-                      </div>
-                      <div className="text-[9px] text-slate-400 font-normal leading-normal">Polishes thoughts for business clarity</div>
-                    </div>
-                  </button>
-
-                  <button
-                    onClick={() => rewriteContentExpression('poetic')}
-                    disabled={isLoadingTips || isRewritingMode !== null}
-                    className="w-full py-2.5 px-3 bg-slate-950/40 hover:bg-slate-950 border border-slate-800/60 rounded-xl text-left hover:border-emerald-500/40 transition-all text-[11px] font-semibold text-slate-200 flex items-center gap-2.5 cursor-pointer disabled:opacity-50"
-                  >
-                    <span className="text-base">{isRewritingMode === 'poetic' ? '⏳' : '🌸'}</span>
-                    <div>
-                      <div className="font-bold text-slate-200">
-                        {isRewritingMode === 'poetic' ? 'Infusing Metaphors...' : 'Poetic Metaphors'}
-                      </div>
-                      <div className="text-[9px] text-slate-400 font-normal leading-normal">Infuses garden metaphor imagery</div>
-                    </div>
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* Advice footer actions */}
-            <div className="p-4 border-t border-slate-800 bg-slate-950">
-              <button
-                onClick={askBotanistAdvice}
-                className="w-full py-3 bg-emerald-500 hover:bg-emerald-600 text-slate-950 font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
-              >
-                <Sparkles className="w-4 h-4 animate-pulse" />
-                Fertilize Advice
-              </button>
-            </div>
-
-          </div>,
-          document.body
-        )}
-
       </div>
-
-      {/* Floating Mascot Advisor activator (portal-rendered at body-level to guarantee fixed viewport alignment without interference) */}
-      {!isCompanionOpen && createPortal(
-        <button
-          onClick={() => setIsCompanionOpen(true)}
-          className={`fixed bottom-6 right-6 bg-slate-900 hover:bg-slate-950 text-emerald-400 hover:text-emerald-300 p-4 rounded-full shadow-2xl border border-slate-800/80 active:scale-95 duration-200 flex items-center justify-center gap-2 cursor-pointer z-50 animate-fade-in ${
-            content && content.replace(/<[^>]*>/g, '').trim().length > 0 ? 'opacity-25 hover:opacity-100 transition-opacity' : 'opacity-100'
-          }`}
-          title="Consult Botanist Assistant"
-        >
-          <Sprout className="w-5 h-5 animate-bounce-slow" />
-          <span className="text-xs font-mono font-semibold tracking-wider">ASK {(profile.companionName || "Sprouty").toUpperCase()}</span>
-        </button>,
-        document.body
-      )}
 
       {/* Custom Delete Confirmation Modal */}
       {isDeleteModalOpen && (() => {

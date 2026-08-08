@@ -277,26 +277,26 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     );
   });
 
-  // Safe style formulas for the dashboard seedlings card grid based on landing page note styles
+  // Safe style formulas for the dashboard seedlings card grid based on high-contrast legible notes
   const getCardStyles = (index: number) => {
     const styles = [
       {
-        container: 'bg-[#fdda64] border-[#eed052] text-slate-900 shadow-sm hover:shadow-md hover:rotate-[0.5deg]',
-        text: 'text-amber-900/90',
-        badge: 'bg-white/65 text-amber-950 border border-[#eed052]/30',
-        tag: 'text-amber-800/80'
+        container: 'bg-[#fcf8e8] border border-amber-200/80 text-slate-900 shadow-xs hover:shadow-md hover:border-amber-400 transition-all',
+        text: 'text-slate-800',
+        badge: 'bg-amber-100 text-amber-900 border border-amber-300/60 font-semibold',
+        tag: 'text-amber-900/80 font-medium'
       },
       {
-        container: 'bg-[#d8efff] border-[#badcfe] text-slate-900 shadow-sm hover:shadow-md hover:rotate-[-0.5deg]',
-        text: 'text-[#1b4d66]/90',
-        badge: 'bg-white/65 text-[#1b4d66] border border-[#badcfe]/30',
-        tag: 'text-[#1b4d66]/80'
+        container: 'bg-[#f0f7fc] border border-sky-200/80 text-slate-900 shadow-xs hover:shadow-md hover:border-sky-400 transition-all',
+        text: 'text-slate-800',
+        badge: 'bg-sky-100 text-sky-900 border border-sky-300/60 font-semibold',
+        tag: 'text-sky-900/80 font-medium'
       },
       {
-        container: 'bg-[#cae9d5] border-[#93cfa9] text-slate-950 shadow-sm hover:shadow-md hover:rotate-[0.5deg]',
-        text: 'text-[#164227]/90',
-        badge: 'bg-white/65 text-[#164227] border border-[#93cfa9]/30',
-        tag: 'text-[#164227]/80'
+        container: 'bg-[#f0f8f3] border border-emerald-200/80 text-slate-900 shadow-xs hover:shadow-md hover:border-emerald-400 transition-all',
+        text: 'text-slate-800',
+        badge: 'bg-emerald-100 text-emerald-900 border border-emerald-300/60 font-semibold',
+        tag: 'text-emerald-900/80 font-medium'
       }
     ];
     return styles[index % styles.length];
@@ -386,10 +386,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
         </div>
 
-        {/* Right Search Input Box matching screenshot layout */}
+        {/* Right Search Input Box with enlarged mobile & desktop footprint */}
         <div className="flex items-center gap-3 w-full md:w-auto self-start md:self-center">
-          <div className="relative w-full md:w-64">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+          <div className="relative w-full md:w-80 lg:w-96">
+            <Search className="w-5 h-5 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
             <input
               type="text"
               value={searchQuery}
@@ -411,10 +411,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 }
               }}
               placeholder="Search your garden..."
-              className="w-full pl-9 pr-8 py-2 border border-slate-200/80 bg-slate-100/50 hover:bg-slate-50 focus:bg-white rounded-xl text-xs font-mono focus:outline-hidden focus:ring-1 focus:ring-emerald-700/20 transition-all text-left cursor-pointer"
+              className="w-full pl-11 pr-10 py-3 sm:py-3.5 border border-slate-200/80 bg-slate-100/70 hover:bg-slate-50 focus:bg-white rounded-2xl text-sm font-sans font-medium focus:outline-hidden focus:ring-2 focus:ring-emerald-700/20 transition-all text-left cursor-pointer min-h-[48px]"
             />
             {/* Quick Helper Shortcut Badge */}
-            <span className="absolute right-2.5 top-1/2 -translate-y-1/2 bg-slate-200/55 text-[9px] font-mono text-slate-500 font-semibold px-1.5 py-0.5 rounded pointer-events-none hidden lg:inline">
+            <span className="absolute right-3 top-1/2 -translate-y-1/2 bg-slate-200/60 text-[10px] font-mono text-slate-500 font-semibold px-2 py-0.5 rounded-md pointer-events-none hidden lg:inline">
               ESC
             </span>
           </div>
@@ -944,10 +944,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   <Loader2 className="w-10 h-10 text-emerald-600 animate-spin" />
                   <div className="space-y-1">
                     <p className="text-sm font-sans font-bold text-slate-800">
-                      Sprouty is compiling your report...
+                      Compiling your report...
                     </p>
                     <p className="text-xs text-slate-400 max-w-xs mx-auto">
-                      Analyzing seedling density, streak counts, and drafting companion commentary.
+                      Analyzing note density, streak counts, and drafting summary.
                     </p>
                   </div>
                 </div>
