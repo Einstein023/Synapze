@@ -244,7 +244,7 @@ export const GardenProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [profile, setProfile] = useState<GardenerProfile>(defaultProfile());
   const [seedlings, setSeedlings] = useState<SeedlingNode[]>([]);
   const [activities, setActivities] = useState<ActivityMetric[]>([]);
-  const [notifications, setNotifications] = useState<NotificationAlert[]>(defaultNotifications);
+  const [notifications, setNotifications] = useState<NotificationAlert[]>([]);
   const [isOffline, setIsOffline] = useState<boolean>(typeof navigator !== 'undefined' ? !navigator.onLine : false);
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(true);
@@ -256,16 +256,8 @@ export const GardenProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [xpPopups, setXpPopups] = useState<{ id: string; amount: number; source: string; timestamp: number }[]>([]);
   const [evolutionTrigger, setEvolutionTrigger] = useState<{ active: boolean; prevLevel: number; nextLevel: number; companionName: string; prevEmoji: string; nextEmoji: string; title: string } | null>(null);
 
-  const triggerHaptic = (pattern: number | number[] = 10) => {
-    if (profile && profile.hapticFeedback === false) return;
-    if (typeof window !== 'undefined' && window.navigator && typeof window.navigator.vibrate === 'function') {
-      try {
-        window.navigator.vibrate(pattern);
-      } catch (e) {
-        // Safe catch for sandbox iframe browser permission exceptions
-      }
-    }
-  };
+  // Haptic feedback removed
+  const triggerHaptic = (_pattern: number | number[] = 10) => {};
 
   const addXpPopup = (amount: number, source: string) => {
     const id = 'xp_' + Math.random().toString(36).substring(2, 11);
@@ -992,11 +984,6 @@ export const GardenProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         title: newDetails.title
       });
 
-      triggerPushNotification(
-        'Level Up & Evolved!', 
-        `${profile.companionName} is now Level ${nextLvl} and has evolved into: ${newDetails.title}!`, 
-        'achievement'
-      );
       triggerHaptic([40, 80, 40, 80, 50]);
     } else {
       triggerHaptic(12);
@@ -1028,32 +1015,8 @@ export const GardenProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   };
 
-  // In-app push notifications alert dispatcher
-  const triggerPushNotification = (title: string, body: string, type: NotificationAlert['type'] = 'system') => {
-    const newNotif: NotificationAlert = {
-      id: 'notif_' + Math.random().toString(36).substring(2, 11),
-      title,
-      body,
-      timestamp: new Date().toISOString(),
-      type,
-      read: false
-    };
-
-    setNotifications(prev => {
-      const updated = [newNotif, ...prev].slice(0, 30);
-      localStorage.setItem(`synapze_notif_${currentUserUid}`, JSON.stringify(updated));
-      return updated;
-    });
-
-    // Check if the user browser is active and simulate real HTML5 Notification standard if supported and allowed
-    if (Notification.permission === 'granted' && profile.pushNotifications) {
-      try {
-        new Notification(title, { body, icon: '/assets/favicon.ico' });
-      } catch (err) {
-        console.warn("Failed standard push execution (iframe restrictions active):", err);
-      }
-    }
-  };
+  // Notifications system removed
+  const triggerPushNotification = (_title: string, _body: string, _type: NotificationAlert['type'] = 'system') => {};
 
   const clearLocalCache = () => {
     localStorage.clear();
@@ -1063,6 +1026,7 @@ export const GardenProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   // 1. Password Verification
   const verifyPassword = async (password: string): Promise<boolean> => {
+    if (authProvider === 'google' || password === 'google-oauth-bypass') return true;
     if (!userEmail) return false;
     const normalizedEmail = userEmail.toLowerCase().trim();
     let reg = getRegistry();

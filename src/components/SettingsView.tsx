@@ -336,8 +336,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onNavigateToLanding,
   const { 
     profile, 
     updateProfile, 
-    triggerPushNotification, 
-    triggerHaptic,
+    triggerPushNotification,
     clearLocalCache, 
     firebaseActive, 
     isOffline, 
@@ -356,8 +355,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onNavigateToLanding,
   const [bio, setBio] = useState(profile.bio);
   const [companionName, setCompanionName] = useState(profile.companionName?.toUpperCase() || 'SPROUTY');
   const [companionType, setCompanionType] = useState(profile.companionType);
-  const [pushNotifications, setPushNotifications] = useState(profile.pushNotifications);
-  const [hapticFeedback, setHapticFeedback] = useState(profile.hapticFeedback !== false);
   const [profilePicture, setProfilePicture] = useState(profile.profilePicture || 'avatar_explorer');
 
   // New subpage view state
@@ -413,8 +410,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onNavigateToLanding,
         bio,
         companionName: companionName.trim().toUpperCase(),
         companionType,
-        pushNotifications,
-        hapticFeedback,
         profilePicture
       })
       .then(() => {
@@ -427,15 +422,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onNavigateToLanding,
     }, 600); // 600ms debounce
 
     return () => clearTimeout(delayDebounceFn);
-  }, [displayName, bio, companionName, companionType, pushNotifications, hapticFeedback, profilePicture]);
-
-  const dispatchTestNotification = () => {
-    triggerPushNotification(
-      'Push Alert Test Sown!',
-      'This is an illustrative sandbox workspace alert.',
-      'system'
-    );
-  };
+  }, [displayName, bio, companionName, companionType, profilePicture]);
 
   const handlePruneCache = () => {
     setShowWipeConfirm(true);
@@ -543,7 +530,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onNavigateToLanding,
   }
 
   return (
-    <div className="max-w-4xl mx-auto space-y-8 animate-fade-in text-slate-800">
+    <div className="max-w-4xl mx-auto space-y-8 animate-fade-in text-slate-800 scroll-smooth" id="settings-view-container">
       
       {/* Settings Header */}
       <div className="bg-[#203d36] border border-[#203d36]/30 rounded-2xl p-6 md:p-8 shadow-xs flex items-center justify-between gap-6 relative overflow-hidden">
@@ -720,87 +707,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onNavigateToLanding,
                 className="w-full bg-slate-50 border border-slate-200 text-sm px-4 py-3 rounded-xl focus:outline-none focus:border-forest-500 text-slate-800 placeholder-slate-400 transition-colors focus:bg-white text-left font-semibold"
                 required
               />
-            </div>
-          </div>
-        </div>
-
-        {/* Row 3: Device Push Alerts and Telemetry reset */}
-        <div className="bg-white border border-slate-200/80 rounded-2xl p-6 shadow-xs space-y-6">
-          <h3 className="font-display font-semibold text-base text-slate-800 flex items-center gap-2 pb-3 border-b border-slate-100 uppercase tracking-wider font-mono">
-            <Bell className="w-4 h-4 text-forest-500" />
-            Push Engagement Alerts
-          </h3>
-
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 text-left">
-            <div className="space-y-1">
-              <div className="text-sm font-bold text-slate-800">What are Push Engagement Alerts?</div>
-              <p className="text-slate-500 text-xs">These alerts simulate notifications inside this web session. They keep you active by prompting daily hydration reminders, milestone gains, and companion chat responses directly on your device.</p>
-            </div>
-            
-            <div className="flex items-center gap-3 shrink-0 self-start sm:self-center">
-              <button
-                type="button"
-                onClick={() => setPushNotifications(!pushNotifications)}
-                className={`border rounded-xl px-4 py-2 text-xs font-semibold select-none cursor-pointer transition-colors ${
-                  pushNotifications 
-                    ? 'bg-emerald-50 border-emerald-300 text-emerald-700' 
-                    : 'bg-slate-50 border-slate-200 text-slate-500'
-                }`}
-              >
-                {pushNotifications ? '🟢 Enabled' : '🔴 Disabled'}
-              </button>
-
-              <button
-                type="button"
-                onClick={dispatchTestNotification}
-                className="px-4 py-2 bg-slate-900 hover:bg-black text-white text-xs font-mono font-bold rounded-xl cursor-pointer"
-              >
-                TEST_ALERT
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* Row 4: Tactile & Haptic Feedback */}
-        <div className="bg-white border border-slate-200/80 rounded-2xl p-6 shadow-xs space-y-6">
-          <h3 className="font-display font-semibold text-base text-slate-800 flex items-center gap-2 pb-3 border-b border-slate-100 uppercase tracking-wider font-mono">
-            <Sparkles className="w-4 h-4 text-forest-500" />
-            Tactile (Haptic) Feedback
-          </h3>
-
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 text-left">
-            <div className="space-y-1">
-              <div className="text-sm font-bold text-slate-800">Tactile Vibration Responses</div>
-              <p className="text-slate-500 text-xs">Activate physically felt rhythmic vibrations on supported devices when completing tasks, earning experience points, saving drafts, and during level evolution events.</p>
-            </div>
-            
-            <div className="flex items-center gap-3 shrink-0 self-start sm:self-center">
-              <button
-                type="button"
-                onClick={() => {
-                  const val = !hapticFeedback;
-                  setHapticFeedback(val);
-                  if (val) {
-                    triggerHaptic([30, 50, 30]);
-                  }
-                }}
-                className={`border rounded-xl px-4 py-2 text-xs font-semibold select-none cursor-pointer transition-colors ${
-                  hapticFeedback 
-                    ? 'bg-emerald-50 border-emerald-300 text-emerald-700' 
-                    : 'bg-slate-50 border-slate-200 text-slate-500'
-                }`}
-              >
-                {hapticFeedback ? '🟢 Enabled' : '🔴 Disabled'}
-              </button>
-
-              <button
-                type="button"
-                disabled={!hapticFeedback}
-                onClick={() => triggerHaptic([40, 80, 40, 80, 50])}
-                className="px-4 py-2 bg-slate-900 hover:bg-black disabled:opacity-50 disabled:cursor-not-allowed text-white text-xs font-mono font-bold rounded-xl cursor-pointer transition-all"
-              >
-                TEST_VIBRATION
-              </button>
             </div>
           </div>
         </div>

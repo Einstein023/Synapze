@@ -125,103 +125,6 @@ export const CompanionCenter: React.FC = () => {
     setFeedLogs(prev => [logMsg, ...prev].slice(0, 5));
   };
 
-  // Generate a daily consistency grid (7 rows x 26 columns = past half year)
-  const renderConsistencyGrid = () => {
-    const today = new Date();
-    today.setHours(12, 0, 0, 0); // Normalize time
-    const currentDayOfWeek = today.getDay(); // 0 is Sunday, 6 is Saturday
-
-    const gridCols = [];
-    
-    // Group seedlings by their localized date key "YYYY-MM-DD"
-    const notesByDate: Record<string, typeof seedlings> = {};
-    seedlings.forEach(note => {
-      if (note.createdAt) {
-        const sDate = new Date(note.createdAt);
-        if (!isNaN(sDate.getTime())) {
-          const dateKey = sDate.toISOString().split('T')[0];
-          if (!notesByDate[dateKey]) {
-            notesByDate[dateKey] = [];
-          }
-          notesByDate[dateKey].push(note);
-        }
-      }
-    });
-
-    // Render 26 columns (weeks), ending at column 25 which contains the current week
-    for (let c = 0; c < 26; c++) {
-      const colCells = [];
-      for (let r = 0; r < 7; r++) {
-        // Calculate the day offset for this column & row relative to today
-        // Column 25 corresponds to the current week. Row corresponds to the day of week.
-        const dayOffset = (c - 25) * 7 + (r - currentDayOfWeek);
-        const cellDate = new Date(today.getTime() + dayOffset * 24 * 60 * 60 * 1000);
-        
-        const year = cellDate.getFullYear();
-        const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-        const monthStr = monthNames[cellDate.getMonth()];
-        const dayNum = cellDate.getDate();
-        const dateKey = cellDate.toISOString().split('T')[0];
-        const dateLabel = `${monthStr} ${dayNum}, ${year}`;
-
-        const isFuture = dayOffset > 0;
-        const notesOnThisDate = notesByDate[dateKey] || [];
-        const notesCount = notesOnThisDate.length;
-
-        let opacityClass = 'bg-slate-100 hover:bg-slate-200/80';
-        let tooltipText = `📅 ${dateLabel}: No knowledge planted.`;
-
-        if (isFuture) {
-          opacityClass = 'bg-slate-50 border border-slate-100/30 cursor-not-allowed opacity-20';
-          tooltipText = `📅 ${dateLabel} (Future Day)`;
-        } else if (notesCount > 0) {
-          tooltipText = `📅 ${dateLabel}: Sowed ${notesCount} note${notesCount > 1 ? 's' : ''} ("${notesOnThisDate.map(n => n.title).join(', ')}")`;
-          if (notesCount === 1) {
-            opacityClass = 'bg-forest-100 border border-forest-200/40 hover:bg-forest-200';
-          } else if (notesCount === 2) {
-            opacityClass = 'bg-forest-200 hover:bg-forest-300';
-          } else if (notesCount === 3) {
-            opacityClass = 'bg-forest-500 hover:bg-forest-600';
-          } else {
-            opacityClass = 'bg-forest-600 hover:bg-forest-700 text-white';
-          }
-        }
-
-        colCells.push(
-          <div 
-            key={r} 
-            className={`w-3.5 h-3.5 rounded-sm transition-all duration-150 cursor-pointer relative group/cell ${opacityClass}`}
-            title={tooltipText}
-          >
-            {/* Tooltip Hover Overlay Card */}
-            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover/cell:flex flex-col bg-slate-950 text-white font-mono text-[9px] p-2 rounded shadow-xl z-50 whitespace-nowrap pointer-events-none border border-slate-800">
-              <span className="font-bold text-emerald-400">{dateLabel}</span>
-              <span className="text-slate-300">
-                {notesCount > 0 ? `🌱 Sowed ${notesCount} note${notesCount > 1 ? 's' : ''}` : `💤 Dormant Soil`}
-              </span>
-              {notesCount > 0 && (
-                <div className="max-w-[150px] truncate text-slate-400 font-sans mt-0.5 border-t border-slate-800 pt-0.5">
-                  {notesOnThisDate.map(n => n.title).join(', ')}
-                </div>
-              )}
-            </div>
-          </div>
-        );
-      }
-      gridCols.push(<div key={c} className="flex flex-col gap-1">{colCells}</div>);
-    }
-
-    return (
-      <div className="flex gap-1 overflow-x-auto custom-scrollbar pb-3 justify-center select-none bg-slate-50/75 p-5 rounded-2xl border border-slate-100">
-        <div className="flex gap-1">
-          {gridCols.map((col, index) => (
-            <div key={index}>{col}</div>
-          ))}
-        </div>
-      </div>
-    );
-  };
-
   return (
     <div className="space-y-8 animate-fade-in text-slate-800">
       
@@ -237,7 +140,7 @@ export const CompanionCenter: React.FC = () => {
           </div>
           
           {/* Mascot Large Avatar */}
-          <div className="w-28 h-28 bg-forest-50 border-4 border-forest-100 shadow-inner rounded-full flex items-center justify-center text-6xl mb-4 select-none animate-pulse" style={{ animationDuration: '4s' }}>
+          <div className="w-28 h-28 bg-forest-50 border-4 border-forest-100 shadow-inner rounded-full flex items-center justify-center text-6xl mb-4 select-none">
             {compInfo.avatarEmoji}
           </div>
 
@@ -366,83 +269,6 @@ export const CompanionCenter: React.FC = () => {
 
         </div>
 
-      </div>
-
-      {/* Consistency matrix (Daily activity tracker) */}
-      <div className="bg-white border border-slate-200/80 rounded-2xl p-6 shadow-xs">
-        <div className="flex items-center justify-between mb-4">
-          <div className="space-y-1">
-            <h3 className="font-display font-bold text-lg text-slate-800 flex items-center gap-2">
-              Sowing Consistency Grid
-            </h3>
-            <p className="text-slate-500 text-xs">
-              Keep your garden green!
-            </p>
-          </div>
-          <span className="text-xs font-mono font-bold text-emerald-600 bg-emerald-50 border border-emerald-200/50 rounded-lg px-2.5 py-1">
-            STREAK HEALTH: {profile.streakDays} DAYS
-          </span>
-        </div>
-
-        {renderConsistencyGrid()}
-
-        <div className="flex justify-between text-[10px] text-slate-400 font-mono mt-3 px-1">
-          <span>Less active (Dormant Soil)</span>
-          <div className="flex gap-1 items-center">
-            <div className="w-2.5 h-2.5 rounded bg-slate-100" />
-            <div className="w-2.5 h-2.5 rounded bg-emerald-100" />
-            <div className="w-2.5 h-2.5 rounded bg-forest-200" />
-            <div className="w-2.5 h-2.5 rounded bg-forest-500" />
-            <div className="w-2.5 h-2.5 rounded bg-forest-600" />
-            <span className="ml-1">More active (Fully Hydrated)</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Badges checklist */}
-      <div className="bg-white border border-slate-200/80 rounded-2xl p-6 shadow-xs text-left">
-        <h3 className="font-display font-bold text-lg text-slate-800 flex items-center gap-2 mb-4">
-          Botanist Badges & Core Talents
-        </h3>
-        
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          {[
-            { tag: 'Sprout Emperor', desc: 'Plant at least 10 active knowledge seedlings.', unlocked: seedlings.filter(s => s.status !== 'archived').length >= 10 },
-            { tag: 'Synaptic Monarch', desc: 'Amass massive knowledge, reaching at least 800 XP.', unlocked: totalXp >= 800 },
-            { tag: 'Lord of Streaks', desc: 'Maintain consecutive hydration streak of 7+ days.', unlocked: (profile.streakDays || 0) >= 7 },
-            { tag: 'Cloud Overlord', desc: 'Establish stable connections, reaching at least 1500 XP.', unlocked: totalXp >= 1500 },
-            { tag: 'Sage Companion', desc: 'Grow Companion level to level 5 status or above.', unlocked: level >= 5 },
-            { tag: 'Master Composter', desc: 'Compost or prune at least 5 different knowledge seedlings.', unlocked: activities.filter(a => a.actionText.includes('Composted') || a.actionText.includes('Pruned') || a.actionText.includes('note file')).length >= 5 }
-          ].map((badge, idx) => (
-            <div 
-              key={idx} 
-              className={`p-4 rounded-xl border flex items-center gap-3.5 transition-all ${
-                badge.unlocked 
-                  ? 'bg-amber-50/40 border-amber-200 hover:border-amber-300 shadow-xs' 
-                  : 'bg-slate-50/40 border-slate-100 opacity-60'
-              }`}
-            >
-              <div className={`w-12 h-12 rounded-full border shrink-0 flex items-center justify-center text-xl shadow-inner relative ${
-                badge.unlocked 
-                  ? 'bg-amber-100 border-amber-300 text-amber-700 font-semibold ring-4 ring-amber-400/10' 
-                  : 'bg-slate-100 border-slate-200 text-slate-450 font-normal'
-              }`}>
-                {badge.unlocked ? (
-                  <Crown className="w-5 h-5 text-amber-600 animate-bounce" style={{ animationDuration: '3s' }} />
-                ) : (
-                  <span className="text-xs">🔒</span>
-                )}
-              </div>
-              <div className="space-y-0.5 min-w-0">
-                <div className={`text-xs font-bold truncate ${badge.unlocked ? 'text-amber-950 font-serif' : 'text-slate-400 font-medium'}`}>{badge.tag}</div>
-                <div className="text-[10px] text-slate-500 leading-normal line-clamp-2">{badge.desc}</div>
-                <div className="text-[9px] font-semibold text-amber-700 uppercase tracking-widest leading-none pt-0.5">
-                  {badge.unlocked ? '👑 UNLOCKED' : 'LOCKED'}
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
       </div>
 
     </div>

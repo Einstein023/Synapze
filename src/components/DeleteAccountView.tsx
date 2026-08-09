@@ -122,7 +122,7 @@ export const DeleteAccountView: React.FC<DeleteAccountViewProps> = ({
   };
 
   const handleConfirmAction = async () => {
-    if (firebaseActive && !passwordInput.trim()) {
+    if (firebaseActive && authProvider !== 'google' && !passwordInput.trim()) {
       setVerifyError('Verification password or OTP code is required.');
       return;
     }
@@ -131,7 +131,7 @@ export const DeleteAccountView: React.FC<DeleteAccountViewProps> = ({
     setVerifyError('');
 
     try {
-      const verifier = passwordInput.trim() || 'garden123';
+      const verifier = (authProvider === 'google' || !passwordInput.trim()) ? 'google-oauth-bypass' : passwordInput.trim();
       if (activeModal === 'delete') {
         const res = await deleteAccount(verifier, reason);
         if (res.success) {
@@ -226,7 +226,7 @@ export const DeleteAccountView: React.FC<DeleteAccountViewProps> = ({
   };
 
   return (
-    <div className="min-h-[calc(100vh-73px)] bg-slate-50/50 flex flex-col items-center justify-start p-4 sm:p-6 md:p-8 pt-8" id="delete-account-view">
+    <div className="min-h-[calc(100vh-73px)] bg-slate-50/50 flex flex-col items-center justify-start p-4 sm:p-6 md:p-8 pt-8 scroll-smooth" id="delete-account-view">
       
       {/* 2. Main Content Card Container */}
       <div className="max-w-lg w-full space-y-6 flex flex-col" id="delete-main-container">
@@ -296,7 +296,7 @@ export const DeleteAccountView: React.FC<DeleteAccountViewProps> = ({
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -15 }}
                 transition={{ duration: 0.2 }}
-                className="bg-white border border-slate-200/60 rounded-3xl p-6 sm:p-8 md:p-10 shadow-sm space-y-8"
+                className="bg-white border border-slate-200/60 rounded-3xl p-5 sm:p-8 md:p-10 shadow-sm space-y-6 sm:space-y-8 w-full max-w-full overflow-hidden"
                 id="delete-content-card"
               >
                 <div className="pt-2">
@@ -320,9 +320,9 @@ export const DeleteAccountView: React.FC<DeleteAccountViewProps> = ({
                 </div>
 
                 {/* 6 Digit Input Boxes */}
-                <div className="flex items-center justify-center gap-2 py-2" id="code-verify-digit-container">
+                <div className="flex items-center justify-center gap-1 sm:gap-2 py-2 w-full max-w-full overflow-hidden px-1" id="code-verify-digit-container">
                   {/* First 3 boxes */}
-                  <div className="flex gap-2">
+                  <div className="flex gap-1 sm:gap-2 min-w-0 shrink">
                     {[0, 1, 2].map((idx) => (
                       <input
                         key={idx}
@@ -335,16 +335,16 @@ export const DeleteAccountView: React.FC<DeleteAccountViewProps> = ({
                         onChange={(e) => handleOtpChange(e.target.value, idx)}
                         onKeyDown={(e) => handleOtpKeyDown(e, idx)}
                         onPaste={handleOtpPaste}
-                        className="w-11 h-14 sm:w-12 sm:h-16 rounded-2xl bg-black text-white font-mono font-bold text-lg sm:text-xl text-center focus:outline-none transition-all border-2 border-transparent focus:border-emerald-500 focus:shadow-[0_0_8px_rgba(16,185,129,0.4)]"
+                        className="w-9 h-12 xs:w-10 xs:h-14 sm:w-12 sm:h-16 rounded-xl sm:rounded-2xl bg-black text-white font-mono font-bold text-base sm:text-xl text-center focus:outline-none transition-all border-2 border-transparent focus:border-emerald-500 focus:shadow-[0_0_8px_rgba(16,185,129,0.4)] shrink min-w-0"
                       />
                     ))}
                   </div>
 
                   {/* Hyphen */}
-                  <span className="text-slate-800 font-bold text-xl px-1 select-none">-</span>
+                  <span className="text-slate-800 font-bold text-lg sm:text-xl px-0.5 sm:px-1 select-none shrink-0">-</span>
 
                   {/* Last 3 boxes */}
-                  <div className="flex gap-2">
+                  <div className="flex gap-1 sm:gap-2 min-w-0 shrink">
                     {[3, 4, 5].map((idx) => (
                       <input
                         key={idx}
@@ -357,7 +357,7 @@ export const DeleteAccountView: React.FC<DeleteAccountViewProps> = ({
                         onChange={(e) => handleOtpChange(e.target.value, idx)}
                         onKeyDown={(e) => handleOtpKeyDown(e, idx)}
                         onPaste={handleOtpPaste}
-                        className="w-11 h-14 sm:w-12 sm:h-16 rounded-2xl bg-black text-white font-mono font-bold text-lg sm:text-xl text-center focus:outline-none transition-all border-2 border-transparent focus:border-emerald-500 focus:shadow-[0_0_8px_rgba(16,185,129,0.4)]"
+                        className="w-9 h-12 xs:w-10 xs:h-14 sm:w-12 sm:h-16 rounded-xl sm:rounded-2xl bg-black text-white font-mono font-bold text-base sm:text-xl text-center focus:outline-none transition-all border-2 border-transparent focus:border-emerald-500 focus:shadow-[0_0_8px_rgba(16,185,129,0.4)] shrink min-w-0"
                       />
                     ))}
                   </div>
@@ -439,8 +439,8 @@ export const DeleteAccountView: React.FC<DeleteAccountViewProps> = ({
                   </p>
                 </div>
 
-                {/* Verification password inputs (If firebase active) */}
-                {firebaseActive && (
+                {/* Verification password inputs (If firebase active and not Google OAuth) */}
+                {firebaseActive && authProvider !== 'google' && (
                   <div className="bg-slate-50/50 p-4 rounded-2xl border border-slate-100 text-left space-y-3.5" id="warning-verification-box">
                     <div className="flex items-center justify-between text-xs font-semibold" id="warning-verification-labels">
                       <label className="text-slate-500 font-medium" id="warning-pwd-label">Confirm Master Password</label>
@@ -546,26 +546,6 @@ export const DeleteAccountView: React.FC<DeleteAccountViewProps> = ({
                 <h2 className="font-sans font-bold text-slate-900 text-lg sm:text-xl" id="delete-profile-name">
                   {profile.displayName || userEmail || 'Yanika Phuthon'}
                 </h2>
-
-                {/* Detected Auth Provider Badge */}
-                <div className="pt-1 flex items-center justify-center">
-                  <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border ${
-                    authProvider === 'google'
-                      ? 'bg-blue-50 text-blue-700 border-blue-200'
-                      : authProvider === 'github'
-                      ? 'bg-purple-50 text-purple-700 border-purple-200'
-                      : 'bg-emerald-50 text-emerald-800 border-emerald-200'
-                  }`}>
-                    <ShieldCheck className="w-3.5 h-3.5" />
-                    <span>
-                      {authProvider === 'google'
-                        ? 'Authenticated via Google OAuth'
-                        : authProvider === 'github'
-                        ? 'Authenticated via GitHub OAuth'
-                        : 'Authenticated via Email & Password'}
-                    </span>
-                  </span>
-                </div>
               </div>
 
               {/* Reason Section */}

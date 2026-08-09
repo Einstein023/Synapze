@@ -1,22 +1,40 @@
 import React, { useState } from 'react';
 import { useGarden } from '../lib/gardenState';
-import { Sprout, Plus, Move, Tag, Check, Image, HelpCircle, ArrowRight, Zap, Inbox, Edit3 } from 'lucide-react';
+import { 
+  Plus, 
+  Tag, 
+  Check, 
+  Inbox, 
+  Edit3, 
+  Trash2, 
+  FileText, 
+  CheckSquare, 
+  Clock, 
+  Sparkles,
+  ArrowUpRight,
+  Search,
+  CheckCircle2,
+  CornerDownLeft
+} from 'lucide-react';
 import { stripFormatting } from '../lib/editorUtils';
 
-export const FastCapture: React.FC = () => {
-  const { seedlings, addSeedling, updateSeedling, triggerPushNotification } = useGarden();
+interface FastCaptureProps {
+  onNavigateToEditor?: (id: string) => void;
+}
+
+export const FastCapture: React.FC<FastCaptureProps> = ({ onNavigateToEditor }) => {
+  const { seedlings, addSeedling, updateSeedling, deleteSeedling } = useGarden();
   const [mindInput, setMindInput] = useState('');
   const [isTaskMode, setIsTaskMode] = useState(false);
-  const [selectedTag, setSelectedTag] = useState('draft');
+  const [selectedTag, setSelectedTag] = useState('quick-note');
+  const [filterMode, setFilterMode] = useState<'all' | 'notes' | 'tasks'>('all');
+  const [searchQuery, setSearchQuery] = useState('');
 
-  const presetTags = ['draft', 'quick-note', 'sprint', 'personal', 'idea'];
+  const presetTags = ['quick-note', 'idea', 'sprint', 'personal', 'draft'];
 
-  const handleCapture = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!mindInput.trim()) {
-      triggerPushNotification('Capture Empty', "Please write down a thought first!", 'system');
-      return;
-    }
+  const handleCapture = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!mindInput.trim()) return;
 
     const titlePrefix = isTaskMode ? '📋 ' : '✍️ ';
     const cleanTitle = mindInput.length > 50 ? mindInput.substring(0, 47) + '...' : mindInput;
@@ -30,203 +48,306 @@ export const FastCapture: React.FC = () => {
     });
 
     setMindInput('');
-    triggerPushNotification('Captured!', 'Saved to your inbox. You can edit and expand it in the Editor anytime.', 'plant');
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+      e.preventDefault();
+      handleCapture();
+    }
   };
 
   const capturedNodes = seedlings.filter(s => s.tags.includes('captured') || s.title.includes('Capture'));
 
+  const filteredNodes = capturedNodes.filter(node => {
+    if (filterMode === 'notes' && node.isTask) return false;
+    if (filterMode === 'tasks' && !node.isTask) return false;
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      const matchTitle = node.title.toLowerCase().includes(q);
+      const matchContent = node.content.toLowerCase().includes(q);
+      const matchTag = node.tags.some(t => t.toLowerCase().includes(q));
+      return matchTitle || matchContent || matchTag;
+    }
+    return true;
+  });
+
   return (
-    <div className="space-y-8 animate-fade-in text-slate-800 max-w-4xl mx-auto">
+    <div className="space-y-6 animate-fade-in text-slate-800 max-w-3xl mx-auto">
       
-      {/* Onboarding / How it works Guide */}
-      <div className="bg-white border border-slate-200/80 rounded-2xl p-4 sm:p-6 space-y-3">
+      {/* Page Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200/60 pb-4">
         <div>
-          <h2 className="font-display font-semibold text-slate-900 text-sm sm:text-base">How Fast Capture Works</h2>
-          <p className="text-slate-600 text-xs sm:text-sm mt-1 leading-relaxed hidden sm:block">
-            Think of this as a digital scratching pad for your mind. It is designed to let you download fleeting thoughts or tasks instantly before they slip away.
+          <h1 className="font-display font-bold text-2xl text-slate-900 tracking-tight">
+            Fast Capture
+          </h1>
+          <p className="text-slate-500 text-xs sm:text-sm mt-0.5">
+            Quickly dump ideas, thoughts, or tasks before they slip away.
           </p>
         </div>
-        
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-6 pt-3 border-t border-slate-100">
-          <div className="space-y-0.5 sm:space-y-1">
-            <span className="font-mono text-[10px] sm:text-xs font-bold text-forest-600 block uppercase tracking-wider">Step 01</span>
-            <p className="text-xs text-slate-500 leading-relaxed"><strong>Jot it down:</strong> Type your thoughts freely without worrying about formatting.</p>
-          </div>
-          <div className="space-y-0.5 sm:space-y-1 hidden sm:block">
-            <span className="font-mono text-[10px] sm:text-xs font-bold text-forest-600 block uppercase tracking-wider">Step 02</span>
-            <p className="text-xs text-slate-500 leading-relaxed"><strong>Land in Inbox:</strong> Automatically saved to your inbox below.</p>
-          </div>
-          <div className="space-y-0.5 sm:space-y-1 hidden sm:block">
-            <span className="font-mono text-[10px] sm:text-xs font-bold text-forest-600 block uppercase tracking-wider">Step 03</span>
-            <p className="text-xs text-slate-500 leading-relaxed"><strong>Refine in Editor:</strong> Expand notes and link ideas later.</p>
-          </div>
+        <div className="hidden sm:flex items-center gap-1.5 text-xs text-slate-400 font-mono bg-slate-100 px-3 py-1.5 rounded-lg shrink-0 self-start sm:self-center">
+          <span>Press</span>
+          <kbd className="px-1.5 py-0.5 bg-white rounded border border-slate-200 text-slate-600 font-bold text-[10px] shadow-2xs">⌘ / Ctrl</kbd>
+          <span>+</span>
+          <kbd className="px-1.5 py-0.5 bg-white rounded border border-slate-200 text-slate-600 font-bold text-[10px] shadow-2xs">Enter</kbd>
+          <span>to save</span>
         </div>
       </div>
 
-      {/* Rapid capture core card */}
-      <div className="bg-white border border-slate-200/80 rounded-2xl p-6 md:p-8 shadow-xs relative">
-        <div className="absolute top-0 left-0 w-2 h-full bg-forest-500" />
-        
-        <div className="space-y-1 mb-6">
-          <h1 className="font-display text-2xl font-bold text-slate-900 tracking-tight">Fast Capture Workspace</h1>
-          <p className="text-slate-500 text-sm">Download your thoughts rapidly. We'll help you organize and nurture them later.</p>
-        </div>
-
-        <form onSubmit={handleCapture} className="space-y-6">
+      {/* Main Scratchpad Card */}
+      <div className="bg-white border border-slate-200/80 rounded-2xl p-5 sm:p-6 shadow-xs space-y-4 overflow-hidden">
+        <form onSubmit={handleCapture} className="space-y-4">
           
-          {/* Main textarea mind input */}
-          <div className="space-y-2">
-            <label className="text-xs font-mono font-bold text-slate-400 block tracking-wider uppercase">What is on your mind?</label>
+          {/* Main Textarea */}
+          <div className="relative">
             <textarea
               value={mindInput}
               onChange={(e) => setMindInput(e.target.value)}
-              placeholder="add your idea here"
-              className="w-full h-28 bg-slate-50 border border-slate-200 rounded-xl px-4 py-3.5 text-base focus:outline-none focus:border-forest-500 placeholder-slate-400 transition-colors focus:bg-white leading-relaxed resize-none font-medium"
+              onKeyDown={handleKeyDown}
+              placeholder={isTaskMode ? "Type an action item or task to complete..." : "Write down a thought, idea, or reminder..."}
+              className="w-full h-32 bg-slate-50 border border-slate-200/90 rounded-xl p-4 text-sm focus:outline-none focus:border-forest-500 focus:bg-white text-slate-800 placeholder-slate-400 transition-all leading-relaxed resize-none font-medium focus:ring-3 focus:ring-forest-500/10"
               required
             />
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Controls Bar */}
+          <div className="flex flex-wrap items-center justify-between gap-3 pt-1 border-t border-slate-100">
             
-            {/* Thought format switcher */}
-            <div className="space-y-2.5">
-              <label className="text-xs font-mono font-bold text-slate-400 block tracking-wider uppercase">Create as...</label>
+            {/* Left Controls: Note/Task Switcher & Tag Picker */}
+            <div className="flex flex-wrap items-center gap-2 min-w-0 max-w-full">
               
-              <div className="flex bg-slate-100 p-1.5 rounded-2xl border border-slate-200/50 relative gap-1">
+              {/* Type Switcher */}
+              <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200/60 text-xs font-semibold shrink-0">
                 <button
                   type="button"
                   onClick={() => setIsTaskMode(false)}
-                  className={`flex-1 py-3.5 text-xs sm:text-sm font-bold rounded-xl select-none transition-all cursor-pointer min-h-[48px] flex items-center justify-center gap-1.5 ${
+                  className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all cursor-pointer ${
                     !isTaskMode 
-                      ? 'bg-white text-forest-700 shadow-sm' 
+                      ? 'bg-white text-forest-700 shadow-2xs font-bold' 
                       : 'text-slate-500 hover:text-slate-800'
                   }`}
                 >
-                  📝 Quick Thought
+                  <FileText className="w-3.5 h-3.5" />
+                  <span>Note</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => setIsTaskMode(true)}
-                  className={`flex-1 py-3.5 text-xs sm:text-sm font-bold rounded-xl select-none transition-all cursor-pointer min-h-[48px] flex items-center justify-center gap-1.5 ${
+                  className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all cursor-pointer ${
                     isTaskMode 
-                      ? 'bg-white text-forest-700 shadow-sm' 
+                      ? 'bg-white text-forest-700 shadow-2xs font-bold' 
                       : 'text-slate-500 hover:text-slate-800'
                   }`}
                 >
-                  📋 Action Checkbox
+                  <CheckSquare className="w-3.5 h-3.5" />
+                  <span>Task</span>
                 </button>
               </div>
-            </div>
 
-            {/* Quick Presets tags select */}
-            <div className="space-y-2.5">
-              <label className="text-xs font-mono font-bold text-slate-400 block tracking-wider uppercase">Add Category Tag</label>
-              <div className="flex flex-wrap gap-2 pt-1">
+              {/* Tag Selector Carousel */}
+              <div className="flex items-center gap-1 overflow-x-auto py-0.5 min-w-0 max-w-full no-scrollbar">
                 {presetTags.map(tag => (
                   <button
                     key={tag}
                     type="button"
                     onClick={() => setSelectedTag(tag)}
-                    className={`px-4 py-2.5 rounded-xl text-xs sm:text-sm font-mono border select-none cursor-pointer transition-colors min-h-[44px] flex items-center justify-center ${
+                    className={`px-2.5 py-1 rounded-lg text-xs font-mono transition-colors border cursor-pointer whitespace-nowrap shrink-0 ${
                       selectedTag === tag 
-                        ? 'bg-forest-50 border-forest-300 text-forest-700 font-bold shadow-xs' 
-                        : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300 hover:text-slate-900'
+                        ? 'bg-forest-50 border-forest-300 text-forest-700 font-bold' 
+                        : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300 hover:text-slate-800'
                     }`}
                   >
                     #{tag}
                   </button>
                 ))}
               </div>
+
+            </div>
+
+            {/* Right Control: Submit Button */}
+            <button
+              type="submit"
+              disabled={!mindInput.trim()}
+              className="px-5 py-2 bg-forest-600 hover:bg-forest-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-bold rounded-xl shadow-xs transition-all flex items-center gap-2 cursor-pointer shrink-0 ml-auto"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Save to Inbox</span>
+              <CornerDownLeft className="w-3 h-3 text-emerald-200 hidden sm:inline" />
+            </button>
+
+          </div>
+
+        </form>
+      </div>
+
+      {/* Inbox Section */}
+      <div className="space-y-3 pt-2">
+        
+        {/* Inbox Header & Filters */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          
+          <div className="flex items-center gap-2">
+            <h2 className="font-display font-bold text-slate-800 text-base flex items-center gap-2">
+              <Inbox className="w-4 h-4 text-forest-600" />
+              Captured Inbox
+            </h2>
+            <span className="px-2 py-0.5 rounded-full bg-slate-100 border border-slate-200/80 text-xs font-mono font-bold text-slate-600">
+              {capturedNodes.length}
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2">
+            
+            {/* Search Filter */}
+            {capturedNodes.length > 3 && (
+              <div className="relative">
+                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  placeholder="Filter captures..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-8 pr-3 py-1 bg-white border border-slate-200 rounded-lg text-xs focus:outline-none focus:border-forest-500 text-slate-700 w-36 sm:w-44"
+                />
+              </div>
+            )}
+
+            {/* Mode Filters */}
+            <div className="flex bg-slate-100 p-0.5 rounded-lg border border-slate-200/60 text-[11px] font-semibold">
+              <button
+                onClick={() => setFilterMode('all')}
+                className={`px-2.5 py-1 rounded-md transition-all cursor-pointer ${
+                  filterMode === 'all' ? 'bg-white text-slate-900 shadow-2xs font-bold' : 'text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                All
+              </button>
+              <button
+                onClick={() => setFilterMode('notes')}
+                className={`px-2.5 py-1 rounded-md transition-all cursor-pointer ${
+                  filterMode === 'notes' ? 'bg-white text-slate-900 shadow-2xs font-bold' : 'text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                Notes
+              </button>
+              <button
+                onClick={() => setFilterMode('tasks')}
+                className={`px-2.5 py-1 rounded-md transition-all cursor-pointer ${
+                  filterMode === 'tasks' ? 'bg-white text-slate-900 shadow-2xs font-bold' : 'text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                Tasks
+              </button>
             </div>
 
           </div>
 
-          <button
-            type="submit"
-            id="btn_fast_capture_submit"
-            className="w-full py-4 px-6 bg-forest-500 hover:bg-forest-600 active:bg-forest-700 text-white font-bold text-sm sm:text-base rounded-2xl shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer min-h-[52px]"
-          >
-            <Plus className="w-5 h-5" />
-            Save to Inbox Feed
-          </button>
+        </div>
 
-        </form>
-
-      </div>
-
-      {/* Captured seedlings list view */}
-      <div className="space-y-4">
-        <h3 className="font-display font-semibold text-lg text-slate-800 flex items-center gap-2">
-          <Inbox className="w-5 h-5 text-forest-500" />
-          Your Quick Captures Inbox
-        </h3>
-
-        {capturedNodes.length === 0 ? (
-          <div className="p-12 text-center rounded-2xl border border-dashed border-slate-200 bg-white">
-            <HelpCircle className="w-8 h-8 text-slate-300 mx-auto mb-2" />
-            <p className="text-slate-500 text-sm">No quick captures saved yet. Type a thought above to populate your inbox.</p>
+        {/* Captured Items List */}
+        {filteredNodes.length === 0 ? (
+          <div className="p-8 text-center rounded-2xl border border-dashed border-slate-200/90 bg-white/60 space-y-2">
+            <Inbox className="w-8 h-8 text-slate-300 mx-auto" />
+            <p className="text-slate-500 text-xs sm:text-sm font-medium">
+              {capturedNodes.length === 0 
+                ? "Your inbox is clear. Type a thought above to capture it." 
+                : "No captured items match your search or filter."}
+            </p>
           </div>
         ) : (
-          <div className="space-y-4">
-            {capturedNodes.map(node => (
+          <div className="space-y-2.5">
+            {filteredNodes.map(node => (
               <div 
-                key={node.id} 
-                className="bg-white border border-slate-200/80 p-5 rounded-2xl shadow-xs flex items-start gap-4 transition-all hover:border-forest-200 group"
+                key={node.id}
+                className="bg-white border border-slate-200/80 hover:border-forest-300 p-4 rounded-xl shadow-2xs transition-all flex items-start justify-between gap-3 group"
               >
                 
-                {/* Seedling Status Icon */}
-                <div className="text-emerald-500 shrink-0 py-0.5">
-                  <Sprout className="w-4 h-4" />
-                </div>
-
-                {/* Content */}
-                <div className="flex-1 space-y-2 min-w-0">
-                  <div className="flex items-center gap-2.5">
-                    {node.isTask && (
+                {/* Left Content Area */}
+                <div className="flex items-start gap-3 min-w-0 flex-1">
+                  
+                  {/* Task Checkbox or Note Icon */}
+                  <div className="shrink-0 mt-0.5">
+                    {node.isTask ? (
                       <button
                         onClick={() => updateSeedling(node.id, { isCompleted: !node.isCompleted })}
-                        className={`w-4.5 h-4.5 rounded border flex items-center justify-center cursor-pointer transition-colors ${
+                        className={`w-5 h-5 rounded-md border flex items-center justify-center cursor-pointer transition-all ${
                           node.isCompleted 
-                            ? 'bg-emerald-500 border-emerald-500 text-white' 
-                            : 'border-slate-300 hover:border-emerald-500 hover:bg-slate-50 text-transparent hover:text-slate-400'
+                            ? 'bg-forest-600 border-forest-600 text-white' 
+                            : 'border-slate-300 hover:border-forest-500 bg-white text-transparent'
                         }`}
+                        title={node.isCompleted ? "Mark incomplete" : "Mark completed"}
                       >
-                        ✓
+                        <Check className="w-3.5 h-3.5 stroke-[3]" />
                       </button>
+                    ) : (
+                      <div className="w-5 h-5 rounded-md bg-forest-50 text-forest-600 flex items-center justify-center">
+                        <FileText className="w-3.5 h-3.5" />
+                      </div>
                     )}
-                    <h4 className={`font-display font-bold text-slate-900 group-hover:text-forest-600 transition-colors text-sm md:text-base truncate leading-none ${
-                      node.isCompleted ? 'line-through text-slate-400!' : ''
-                    }`}>
-                      {node.title}
-                    </h4>
                   </div>
 
-                  <p className="text-slate-500 text-xs md:text-sm line-clamp-2 pl-7 select-text">
-                    {stripFormatting(node.content)}
-                  </p>
+                  {/* Text & Meta */}
+                  <div className="min-w-0 flex-1 space-y-1">
+                    
+                    <div className="flex items-center gap-2">
+                      <h3 className={`text-sm font-semibold text-slate-800 transition-colors leading-snug truncate ${
+                        node.isCompleted ? 'line-through text-slate-400' : ''
+                      }`}>
+                        {node.title.replace(/^(📋 |✍️ )/, '')}
+                      </h3>
+                      
+                      <span className="px-2 py-0.5 bg-slate-100 text-slate-600 text-[10px] font-mono rounded font-medium shrink-0">
+                        #{node.tags[0] || 'draft'}
+                      </span>
+                    </div>
 
-                  <div className="flex items-center gap-2 text-xs text-slate-400 pl-7 font-mono">
-                    <span className="bg-forest-50 text-forest-700 px-1.5 py-0.5 rounded leading-none text-[9px] uppercase font-bold text-center">
-                      #{node.tags[0] || 'draft'}
-                    </span>
-                    <span>Saved at {new Date(node.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                    {node.content && (
+                      <p className="text-xs text-slate-500 line-clamp-2 leading-relaxed">
+                        {stripFormatting(node.content)}
+                      </p>
+                    )}
+
+                    <div className="flex items-center gap-2 text-[10px] font-mono text-slate-400 pt-0.5">
+                      <Clock className="w-3 h-3 text-slate-300" />
+                      <span>{new Date(node.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                      <span>•</span>
+                      <span>{new Date(node.createdAt).toLocaleDateString([], { month: 'short', day: 'numeric' })}</span>
+                    </div>
+
                   </div>
 
                 </div>
 
-                {/* Information Badge for User workflow direction */}
-                <div className="text-slate-300 group-hover:text-forest-500 transition-colors py-0.5 shrink-0 flex items-center gap-1 text-xs">
-                  <span className="hidden sm:inline font-mono text-[10px]">Open in Editor</span>
-                  <ArrowRight className="w-4 h-4" />
+                {/* Right Action Buttons */}
+                <div className="flex items-center gap-1 shrink-0 opacity-80 sm:opacity-0 group-hover:opacity-100 transition-opacity">
+                  
+                  {onNavigateToEditor && (
+                    <button
+                      onClick={() => onNavigateToEditor(node.id)}
+                      className="p-1.5 text-slate-400 hover:text-forest-600 hover:bg-forest-50 rounded-lg transition-colors cursor-pointer"
+                      title="Open in Editor"
+                    >
+                      <ArrowUpRight className="w-4 h-4" />
+                    </button>
+                  )}
+
+                  <button
+                    onClick={() => deleteSeedling(node.id)}
+                    className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                    title="Delete capture"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+
                 </div>
 
               </div>
             ))}
           </div>
         )}
+
       </div>
 
     </div>
   );
 };
-

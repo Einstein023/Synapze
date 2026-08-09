@@ -596,28 +596,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                     </div>
 
                     <div className="flex flex-wrap items-center gap-1.5 pt-2">
-                      {/* Type Label Badge */}
-                      <span className={`text-[9px] font-mono font-bold uppercase tracking-widest px-1.5 py-0.5 rounded-md flex items-center gap-1 bg-white/45 text-slate-800 border border-white/20`}>
-                        {seed.isTask ? (
-                          <>
-                            <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
-                            <span>Task</span>
-                          </>
-                        ) : (
-                          <>
-                            <span className="w-1.5 h-1.5 rounded-full bg-sky-500" />
-                            <span>Note</span>
-                          </>
-                        )}
-                      </span>
-
-                      <span className={`text-[9px] font-mono font-bold uppercase tracking-widest px-1.5 py-0.5 rounded-md ${cardStyle.badge}`}>
-                        {seed.status}
-                      </span>
-                      {seed.tags.slice(0, 2).map(tag => (
+                      {seed.tags.slice(0, 3).map(tag => (
                         <span 
                           key={tag} 
-                          className={`text-[9px] font-mono leading-none tracking-wider self-center ${cardStyle.tag}`}
+                          className={`text-[10px] font-mono leading-none tracking-wider self-center ${cardStyle.tag}`}
                         >
                           #{tag}
                         </span>
@@ -804,7 +786,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
               >
                 <div className="w-14 h-14 rounded-full bg-emerald-700/80 flex items-center justify-center">
-                  <Sprout className="w-7 h-7 text-[#fdda64] animate-bounce-slow" />
+                  <Sprout className="w-7 h-7 text-[#fdda64]" />
                 </div>
               </motion.div>
 
@@ -885,7 +867,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             {/* Bottom Status text label inside graph */}
             <div className="absolute bottom-3 left-0 right-0 text-center select-none z-10">
               <span className="text-[8px] font-mono tracking-widest text-slate-400 font-bold uppercase bg-slate-950/40 px-2.5 py-1 rounded-full border border-white/5 inline-flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                 KNOWLEDGE_ECOSYSTEM_ACTIVE
               </span>
             </div>

@@ -11,7 +11,6 @@ import { CommandSearch } from './components/CommandSearch';
 import { SettingsView, AvatarSvg } from './components/SettingsView';
 import { AdminConsoleView } from './components/AdminConsoleView';
 import { LegalView } from './components/LegalView';
-import { ToastNotification } from './components/ToastNotification';
 import { FloatingXpAlerts } from './components/FloatingXpAlerts';
 import { EvolutionModal } from './components/EvolutionModal';
 import { motion, AnimatePresence } from 'motion/react';
@@ -41,7 +40,6 @@ function GardenAppContent() {
     profile, 
     isOffline, 
     setOfflineMode, 
-    notifications, 
     isAuthenticated, 
     userEmail, 
     signOutUser,
@@ -118,25 +116,11 @@ function GardenAppContent() {
     setCurrentTab('editor');
   };
 
-  // Toast notification monitoring (Active slider list for outstanding unread alerts)
-  const [activeToast, setActiveToast] = useState<{ id: string; title: string; body: string } | null>(null);
-  
-  useEffect(() => {
-    const unread = notifications.find(n => !n.read);
-    if (unread) {
-      setActiveToast({ id: unread.id, title: unread.title, body: unread.body });
-      const timer = setTimeout(() => {
-        setActiveToast(null);
-      }, 6000);
-      return () => clearTimeout(timer);
-    }
-  }, [notifications]);
-
   // Render view controller matching tabs
   const renderTabContent = () => {
     switch (currentTab) {
       case 'capture':
-        return <FastCapture />;
+        return <FastCapture onNavigateToEditor={(id) => handleEditNote(id)} />;
       case 'editor':
         return <EditorView activeSeedlingId={editingSeedlingId} onSelectSeedling={setEditingSeedlingId} onBack={() => { setEditingSeedlingId(null); setCurrentTab('dashboard'); }} />;
       case 'companion':
@@ -536,7 +520,7 @@ function GardenAppContent() {
         )}
 
         {/* Primary central canvas spacer */}
-        <main className={`flex-1 overflow-y-auto custom-scrollbar ${isDeletingAccount ? '' : 'md:ml-64'} ${currentTab === 'editor' ? 'p-0 bg-white' : 'p-6 md:p-8'}`}>
+        <main className={`flex-1 overflow-y-auto custom-scrollbar scroll-smooth ${isDeletingAccount ? '' : 'md:ml-64'} ${currentTab === 'editor' ? 'p-0 bg-white' : 'p-6 md:p-8'}`}>
           <AnimatePresence mode="wait">
             <motion.div
               key={currentTab}
@@ -552,16 +536,6 @@ function GardenAppContent() {
         </main>
 
       </div>
-
-      {/* Slide-In Toast Notification Alert system */}
-      {activeToast && (
-        <ToastNotification 
-          title={activeToast.title}
-          body={activeToast.body}
-          onClose={() => setActiveToast(null)}
-          duration={6000}
-        />
-      )}
 
       {/* Global Command palette dialog modal */}
       {isSearchOpen && (
