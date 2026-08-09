@@ -1,10 +1,10 @@
 {
-  "projectId": "pelagic-amulet-h9nlt",
-  "appId": "1:170695184596:web:5cbec851c02b729226ab41",
-  "apiKey": "AIzaSyB0HNfkrPmnp-m3Oh2rS2w_lXvIzJgBJ08",
-  "authDomain": "pelagic-amulet-h9nlt.firebaseapp.com",
-  "firestoreDatabaseId": "ai-studio-bfaddddc-ea36-42b7-bc52-a3c2280143d0",
-  "storageBucket": "pelagic-amulet-h9nlt.firebasestorage.app",
-  "messagingSenderId": "170695184596",
-  "measurementId": ""
+  "apiKey": "AIzaSyArjJkQsQBfqBaLUKFOSgEbdXodrJVP88w",
+  "authDomain": "synapze-b56ea.firebaseapp.com",
+  "projectId": "synapze-b56ea",
+  "storageBucket": "synapze-b56ea.firebasestorage.app",
+  "messagingSenderId": "637564354198",
+  "appId": "1:637564354198:web:51d894dabf6727a3a30cb7",
+  "measurementId": "G-4N0FNHYV7H",
+  "firestoreDatabaseId": "(default)"
 }
