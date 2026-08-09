@@ -201,6 +201,10 @@ export const LandingView: React.FC<LandingViewProps> = ({ onStart, onNavigateToA
 
         {/* Center Desktop Links */}
         <nav className="hidden md:flex items-center gap-8 text-sm font-semibold text-[#5c6e66]">
+          <a href="#hero" className="hover:text-[#203d36] transition-colors relative group py-1">
+            Home
+            <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-[#203d36] transition-all group-hover:w-full" />
+          </a>
           <a href="#features" className="hover:text-[#203d36] transition-colors relative group py-1">
             Features
             <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-[#203d36] transition-all group-hover:w-full" />
@@ -255,6 +259,13 @@ export const LandingView: React.FC<LandingViewProps> = ({ onStart, onNavigateToA
           >
             <div className="flex flex-col gap-3">
               <a 
+                href="#hero" 
+                onClick={() => setMobileMenuOpen(false)}
+                className="text-base font-semibold text-[#203d36] hover:text-[#5c6e66] py-2 border-b border-slate-100"
+              >
+                Home
+              </a>
+              <a 
                 href="#features" 
                 onClick={() => setMobileMenuOpen(false)}
                 className="text-base font-semibold text-[#203d36] hover:text-[#5c6e66] py-2 border-b border-slate-100"
@@ -296,7 +307,7 @@ export const LandingView: React.FC<LandingViewProps> = ({ onStart, onNavigateToA
       </AnimatePresence>
 
       {/* Main Hero Section */}
-      <section className="max-w-7xl mx-auto px-6 pt-12 pb-24 md:pt-20 grid grid-cols-1 lg:grid-cols-12 gap-12 items-center relative z-10">
+      <section id="hero" className="max-w-7xl mx-auto px-6 pt-12 pb-24 md:pt-20 grid grid-cols-1 lg:grid-cols-12 gap-12 items-center relative z-10">
         
         {/* Left Side Content Column */}
         <motion.div 
@@ -658,7 +669,6 @@ export const LandingView: React.FC<LandingViewProps> = ({ onStart, onNavigateToA
             {/* Column 3: The Mind Garden */}
             <div 
               className="bg-white border border-[#203d36]/10 rounded-[2.2rem] p-10 flex flex-col justify-between h-[548px] overflow-hidden group shadow-lg hover:shadow-xl transition-shadow relative text-left md:col-span-2 lg:col-span-1 md:flex-row lg:flex-col"
-              id="community"
             >
               <div className="space-y-4 md:max-w-xs lg:max-w-none md:pr-6 lg:pr-0 flex flex-col justify-center">
                 <h3 className="font-serif text-3xl font-bold text-[#203d36] tracking-tight leading-tight">
@@ -814,7 +824,7 @@ export const LandingView: React.FC<LandingViewProps> = ({ onStart, onNavigateToA
       {/* BOTTOM CTA CALL-TO-ACTION DESIGN BOX */}
       <section 
         className="bg-[#1c332d] text-white mx-6 sm:mx-12 md:mx-20 rounded-3xl py-16 md:py-24 px-6 text-center relative overflow-hidden z-10 shadow-2xl mt-20 sm:mt-28 md:mt-32 mb-24" 
-        id="pricing"
+        id="community"
       >
         {/* Ambient decorative circle overlays */}
         <div className="absolute top-0 right-0 w-96 h-96 bg-white/5 rounded-full blur-3xl pointer-events-none" />
