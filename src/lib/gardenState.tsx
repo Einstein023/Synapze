@@ -1024,6 +1024,14 @@ export const GardenProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     triggerPushNotification('Cache Cleared', 'Local data caches cleared.', 'system');
   };
 
+  // Helper timeout wrapper to ensure network calls don't hang UI on custom domains
+  const withTimeout = <T,>(promise: Promise<T>, timeoutMs: number = 3000, fallbackValue?: T): Promise<T> => {
+    return Promise.race([
+      promise,
+      new Promise<T>((resolve) => setTimeout(() => resolve(fallbackValue as T), timeoutMs))
+    ]);
+  };
+
   // 1. Password Verification
   const verifyPassword = async (password: string): Promise<boolean> => {
     if (authProvider === 'google' || password === 'google-oauth-bypass') return true;
@@ -1035,8 +1043,8 @@ export const GardenProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     if (isFirebaseConfigured && db && !isOffline) {
       try {
         const { doc, getDoc } = await import('firebase/firestore');
-        const docSnap = await getDoc(doc(db, 'users_auth_public', normalizedEmail));
-        if (docSnap.exists()) {
+        const docSnap = await withTimeout(getDoc(doc(db, 'users_auth_public', normalizedEmail)), 2000) as any;
+        if (docSnap && docSnap.exists && docSnap.exists()) {
           reg[normalizedEmail] = docSnap.data() as RegistryUser;
         }
       } catch {}
@@ -1074,7 +1082,7 @@ export const GardenProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     if (isFirebaseConfigured && db && !isOffline) {
       const { doc, setDoc } = await import('firebase/firestore');
-      await setDoc(doc(db, 'users_auth_public', normalizedEmail), reg[normalizedEmail]).catch(() => {});
+      await withTimeout(setDoc(doc(db, 'users_auth_public', normalizedEmail), reg[normalizedEmail]), 2000).catch(() => {});
     }
 
     await signOutUser();
@@ -1098,87 +1106,85 @@ export const GardenProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const normalizedEmail = userEmail.toLowerCase().trim();
     const uidToDelete = currentUserUid;
 
-    // Permanently wipe data using batched writes for scale efficiency and crash protection
+    // Permanently wipe data using batched writes with strict timeout guard against custom domain network lag
     if (isFirebaseConfigured && db && !isOffline && uidToDelete !== 'garden-guest') {
-      try {
-        const { doc, collection, getDocs, writeBatch, deleteDoc, addDoc } = await import('firebase/firestore');
-        
-        // Save the deletion reason feedback to the database first
-        await addDoc(collection(db, 'account_deletions'), {
-          email: normalizedEmail,
-          uid: uidToDelete,
-          reason: reason || 'Not specified',
-          timestamp: new Date().toISOString()
-        }).catch(err => {
-          console.warn("Failed to write deletion reason feedback:", err);
-        });
+      const performRemoteDeletion = async () => {
+        try {
+          const { doc, collection, getDocs, writeBatch, deleteDoc, addDoc } = await import('firebase/firestore');
+          
+          // Save the deletion reason feedback to the database
+          addDoc(collection(db, 'account_deletions'), {
+            email: normalizedEmail,
+            uid: uidToDelete,
+            reason: reason || 'Not specified',
+            timestamp: new Date().toISOString()
+          }).catch(() => {});
 
-        const seedlingsSnap = await getDocs(collection(db, 'users', uidToDelete, 'seedlings')).catch(() => ({ docs: [] }));
-        const activitiesSnap = await getDocs(collection(db, 'users', uidToDelete, 'activities')).catch(() => ({ docs: [] }));
-        
-        // 1. Delete all seedlings and activities in batches
-        let batch = writeBatch(db);
-        let count = 0;
-        
-        for (const docSnap of seedlingsSnap.docs) {
-          batch.delete(docSnap.ref);
-          count++;
-          if (count >= 400) {
-            await batch.commit().catch(err => console.warn("Seedling deletion batch failed:", err));
-            batch = writeBatch(db);
-            count = 0;
-          }
-        }
-
-        for (const docSnap of activitiesSnap.docs) {
-          batch.delete(docSnap.ref);
-          count++;
-          if (count >= 400) {
-            await batch.commit().catch(err => console.warn("Activity deletion batch failed:", err));
-            batch = writeBatch(db);
-            count = 0;
-          }
-        }
-
-        if (count > 0) {
-          await batch.commit().catch(err => console.warn("Final cleanup batch failed:", err));
-        }
-
-        // 2. Delete the user profile doc
-        await deleteDoc(doc(db, 'users', uidToDelete)).catch(err => {
-          console.warn("User profile doc deletion failed:", err);
-        });
-
-        // 3. Delete the users_auth_public entry
-        await deleteDoc(doc(db, 'users_auth_public', normalizedEmail)).catch(err => {
-          console.warn("User public auth simulation entry deletion failed:", err);
-        });
-
-        // 4. Handle Firebase Authentication account deletion
-        const currentUser = auth?.currentUser;
-        if (currentUser) {
-          const isOtp = /^\d{6}$/.test(password);
-          // Reauthenticate email/password users if possible to avoid "requires-recent-login" errors on delete
-          if (currentUser.email && password && !isOtp) {
-            try {
-              const { EmailAuthProvider, reauthenticateWithCredential } = await import('firebase/auth');
-              const credential = EmailAuthProvider.credential(currentUser.email, password);
-              await reauthenticateWithCredential(currentUser, credential);
-            } catch (reauthErr) {
-              console.warn("Reauthentication skipped/failed (possibly Google or non-password auth):", reauthErr);
+          // Fetch subcollections in parallel
+          const [seedlingsSnap, activitiesSnap] = await Promise.all([
+            getDocs(collection(db, 'users', uidToDelete, 'seedlings')).catch(() => ({ docs: [] })),
+            getDocs(collection(db, 'users', uidToDelete, 'activities')).catch(() => ({ docs: [] }))
+          ]);
+          
+          // Delete all seedlings and activities in batches
+          let batch = writeBatch(db);
+          let count = 0;
+          
+          for (const docSnap of (seedlingsSnap as any).docs || []) {
+            batch.delete(docSnap.ref);
+            count++;
+            if (count >= 400) {
+              await batch.commit().catch(() => {});
+              batch = writeBatch(db);
+              count = 0;
             }
           }
-          try {
-            await currentUser.delete();
-          } catch (deleteAuthErr) {
-            console.warn("Soft recovery on Auth user deletion (requires recent login or other provider restriction):", deleteAuthErr);
-            const { signOut } = await import('firebase/auth');
-            await signOut(auth).catch(() => {});
+
+          for (const docSnap of (activitiesSnap as any).docs || []) {
+            batch.delete(docSnap.ref);
+            count++;
+            if (count >= 400) {
+              await batch.commit().catch(() => {});
+              batch = writeBatch(db);
+              count = 0;
+            }
           }
+
+          if (count > 0) {
+            await batch.commit().catch(() => {});
+          }
+
+          // Delete user profile doc & auth entry in parallel
+          await Promise.allSettled([
+            deleteDoc(doc(db, 'users', uidToDelete)),
+            deleteDoc(doc(db, 'users_auth_public', normalizedEmail))
+          ]);
+
+          // Handle Firebase Authentication account deletion
+          const currentUser = auth?.currentUser;
+          if (currentUser) {
+            const isOtp = /^\d{6}$/.test(password);
+            if (currentUser.email && password && !isOtp) {
+              try {
+                const { EmailAuthProvider, reauthenticateWithCredential } = await import('firebase/auth');
+                const credential = EmailAuthProvider.credential(currentUser.email, password);
+                await reauthenticateWithCredential(currentUser, credential);
+              } catch {}
+            }
+            try {
+              await currentUser.delete();
+            } catch {
+              const { signOut } = await import('firebase/auth');
+              await signOut(auth).catch(() => {});
+            }
+          }
+        } catch (err) {
+          console.warn("Remote deletion process encountered network or permission issue:", err);
         }
-      } catch (err) {
-        handleFirestoreError(err, OperationType.DELETE, `users/${uidToDelete}`);
-      }
+      };
+
+      // Ensure remote deletion times out after 3.5 seconds max so user is never stuck
+      await withTimeout(performRemoteDeletion(), 3500);
     }
 
     const reg = getRegistry();
