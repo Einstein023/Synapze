@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useGarden } from '../lib/gardenState';
+import { SeedlingNode } from '../types';
 import { 
   Plus, 
   Tag, 
@@ -14,7 +15,9 @@ import {
   ArrowUpRight,
   Search,
   CheckCircle2,
-  CornerDownLeft
+  CornerDownLeft,
+  AlertTriangle,
+  X
 } from 'lucide-react';
 import { stripFormatting } from '../lib/editorUtils';
 
@@ -29,6 +32,7 @@ export const FastCapture: React.FC<FastCaptureProps> = ({ onNavigateToEditor }) 
   const [selectedTag, setSelectedTag] = useState('quick-note');
   const [filterMode, setFilterMode] = useState<'all' | 'notes' | 'tasks'>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [noteToDelete, setNoteToDelete] = useState<SeedlingNode | null>(null);
 
   const presetTags = ['quick-note', 'idea', 'sprint', 'personal', 'draft'];
 
@@ -332,7 +336,7 @@ export const FastCapture: React.FC<FastCaptureProps> = ({ onNavigateToEditor }) 
                   )}
 
                   <button
-                    onClick={() => deleteSeedling(node.id)}
+                    onClick={() => setNoteToDelete(node)}
                     className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
                     title="Delete capture"
                   >
@@ -347,6 +351,72 @@ export const FastCapture: React.FC<FastCaptureProps> = ({ onNavigateToEditor }) 
         )}
 
       </div>
+
+      {/* Centered High-Visibility Delete Modal */}
+      {noteToDelete && (
+        <div className="fixed inset-0 bg-slate-950/75 backdrop-blur-md flex items-center justify-center p-4 sm:p-6 z-[9999] overflow-y-auto animate-fade-in">
+          <div className="bg-white border border-slate-200/90 rounded-3xl w-full max-w-sm sm:max-w-md shadow-2xl overflow-hidden relative my-auto text-left">
+            
+            {/* Top Red Alert Gradient */}
+            <div className="h-2 bg-gradient-to-r from-rose-500 via-rose-600 to-amber-500 w-full" />
+
+            {/* Close Button Top Right */}
+            <button
+              type="button"
+              onClick={() => setNoteToDelete(null)}
+              className="absolute top-4 right-4 p-1.5 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
+              title="Close"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="p-6 sm:p-7 space-y-5">
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 rounded-2xl bg-rose-100/80 border border-rose-200 flex items-center justify-center text-rose-600 shrink-0 shadow-xs">
+                  <AlertTriangle className="w-6 h-6" />
+                </div>
+                <div className="pr-6">
+                  <h3 className="font-extrabold text-lg sm:text-xl text-slate-900 tracking-tight leading-snug">
+                    Delete Note?
+                  </h3>
+                  <p className="text-slate-500 text-xs sm:text-sm font-medium mt-1 leading-relaxed">
+                    This action cannot be undone and will permanently remove this item.
+                  </p>
+                </div>
+              </div>
+
+              <div className="p-3.5 bg-slate-50 border border-slate-200/80 rounded-2xl">
+                <p className="text-slate-400 text-[10px] font-mono uppercase tracking-wider font-bold mb-1">Note to be deleted:</p>
+                <p className="text-slate-800 font-bold text-sm truncate">
+                  "{noteToDelete.title || 'Untitled Note'}"
+                </p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setNoteToDelete(null)}
+                  className="w-full py-3.5 px-4 bg-slate-100 hover:bg-slate-200/80 text-slate-700 font-bold rounded-2xl text-xs sm:text-sm transition-all cursor-pointer text-center flex items-center justify-center min-h-[48px]"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const id = noteToDelete.id;
+                    setNoteToDelete(null);
+                    await deleteSeedling(id);
+                  }}
+                  className="w-full py-3.5 px-4 bg-rose-600 hover:bg-rose-700 active:scale-[0.98] text-white font-bold rounded-2xl text-xs sm:text-sm transition-all shadow-md shadow-rose-600/25 cursor-pointer flex items-center justify-center gap-2 min-h-[48px]"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  <span>Delete Note</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );

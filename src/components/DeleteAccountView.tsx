@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { ChevronLeft, X, RefreshCw, Eye, EyeOff, ChevronDown, Check, ShieldCheck, Key, Lock, Globe } from 'lucide-react';
+import { ChevronLeft, X, RefreshCw, Eye, EyeOff, ChevronDown, Check, ShieldCheck, Key, Lock, Globe, AlertTriangle, Trash2 } from 'lucide-react';
 import { AvatarSvg } from './SettingsView';
 import { getFriendlyErrorMessage } from '../lib/errorUtils';
 import { useGarden } from '../lib/gardenState';
@@ -226,8 +226,55 @@ export const DeleteAccountView: React.FC<DeleteAccountViewProps> = ({
   };
 
   return (
-    <div className="min-h-[calc(100vh-73px)] bg-slate-50/50 flex flex-col items-center justify-start p-4 sm:p-6 md:p-8 pt-8 scroll-smooth" id="delete-account-view">
+    <div className="min-h-[calc(100vh-73px)] bg-white flex flex-col items-center justify-start p-4 sm:p-6 md:p-8 pt-8 scroll-smooth relative" id="delete-account-view">
       
+      {/* Sleek Delete Progress Popup Modal */}
+      <AnimatePresence>
+        {isVerifying && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-white/80 backdrop-blur-md z-[200] flex items-center justify-center p-4"
+            id="delete-progress-modal"
+          >
+            <motion.div
+              initial={{ scale: 0.9, y: 15 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.9, y: 15 }}
+              transition={{ type: "spring", stiffness: 350, damping: 25 }}
+              className="bg-white border border-rose-100 rounded-3xl p-8 max-w-sm w-full text-center space-y-5 shadow-2xl relative overflow-hidden"
+            >
+              <div className="absolute -top-12 -left-12 w-32 h-32 bg-rose-500/10 rounded-full blur-2xl pointer-events-none" />
+              <div className="absolute -bottom-12 -right-12 w-32 h-32 bg-amber-500/10 rounded-full blur-2xl pointer-events-none" />
+
+              <div className="w-16 h-16 rounded-2xl bg-rose-50 border border-rose-100/80 flex items-center justify-center mx-auto text-rose-600 shadow-xs relative">
+                <RefreshCw className="w-8 h-8 animate-spin text-rose-600" />
+              </div>
+
+              <div className="space-y-1.5">
+                <h3 className="font-sans font-extrabold text-slate-900 text-lg sm:text-xl tracking-tight">
+                  Deleting Account...
+                </h3>
+                <p className="text-slate-500 text-xs font-medium leading-relaxed max-w-xs mx-auto">
+                  Safely purging user identity, sowed seeds, and notes from servers.
+                </p>
+              </div>
+
+              {/* Smooth animated progress line */}
+              <div className="w-full bg-rose-50 rounded-full h-1.5 overflow-hidden">
+                <motion.div
+                  initial={{ x: '-100%' }}
+                  animate={{ x: '100%' }}
+                  transition={{ repeat: Infinity, duration: 1.2, ease: "linear" }}
+                  className="w-1/2 h-full bg-rose-600 rounded-full"
+                />
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* 2. Main Content Card Container */}
       <div className="max-w-lg w-full space-y-6 flex flex-col" id="delete-main-container">
         
@@ -419,97 +466,108 @@ export const DeleteAccountView: React.FC<DeleteAccountViewProps> = ({
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -15 }}
                 transition={{ duration: 0.2 }}
-                className="bg-white border border-slate-200/60 rounded-3xl p-6 sm:p-8 md:p-10 shadow-sm space-y-6 text-center"
+                className="bg-white border border-rose-200/90 rounded-3xl overflow-hidden shadow-2xl space-y-6 text-center relative"
                 id="delete-content-card"
               >
-                {/* Red Warning Badge Pill */}
-                <div className="pt-2" id="warning-badge-wrapper">
-                  <span className="inline-flex items-center px-3.5 py-1 rounded-full text-[10px] sm:text-[11px] font-extrabold bg-rose-50 text-rose-600 border border-rose-100 tracking-wider uppercase" id="warning-badge-pill">
-                    Warning
-                  </span>
-                </div>
+                {/* Red Warning Banner Top Stripe */}
+                <div className="h-2 bg-gradient-to-r from-rose-500 via-rose-600 to-amber-500 w-full" />
 
-                {/* Warning Copy */}
-                <div className="space-y-2.5" id="warning-copy-section">
-                  <h3 className="text-lg sm:text-xl font-bold text-slate-900 tracking-tight leading-snug px-2" id="warning-headline">
-                    Are you sure you want to delete your account?
-                  </h3>
-                  <p className="text-xs sm:text-sm text-slate-500 leading-relaxed max-w-xs mx-auto" id="warning-description">
-                    By deleting your account you will permanently lose all sowed seeds, companion achievements, and notes. This action cannot be undone.
-                  </p>
-                </div>
-
-                {/* Verification password inputs (If firebase active and not Google OAuth) */}
-                {firebaseActive && authProvider !== 'google' && (
-                  <div className="bg-slate-50/50 p-4 rounded-2xl border border-slate-100 text-left space-y-3.5" id="warning-verification-box">
-                    <div className="flex items-center justify-between text-xs font-semibold" id="warning-verification-labels">
-                      <label className="text-slate-500 font-medium" id="warning-pwd-label">Confirm Master Password</label>
-                      <button
-                        type="button"
-                        onClick={handleRequestOtp}
-                        disabled={otpLoading}
-                        className="text-[#203d36] hover:text-black font-bold hover:underline transition-all cursor-pointer text-xs"
-                        id="warning-otp-btn"
-                      >
-                        {otpLoading ? "Sending OTP..." : "Forgot password?"}
-                      </button>
+                <div className="p-6 sm:p-8 space-y-6">
+                  {/* Red Warning Badge Icon & Header */}
+                  <div className="flex flex-col items-center space-y-3" id="warning-badge-wrapper">
+                    <div className="w-14 h-14 rounded-2xl bg-rose-100/90 border border-rose-200 text-rose-600 flex items-center justify-center shadow-xs">
+                      <AlertTriangle className="w-7 h-7" />
                     </div>
-                    
-                    <div className="relative flex items-center" id="warning-pwd-input-wrapper">
-                      <input
-                        type={showPassword ? "text" : "password"}
-                        value={passwordInput}
-                        onChange={(e) => setPasswordInput(e.target.value)}
-                        placeholder="••••••••••••"
-                        className="w-full bg-white border border-slate-200 text-sm pl-4 pr-10 py-3 rounded-xl focus:outline-none focus:border-[#203d36] text-slate-800 placeholder-slate-400 font-mono transition-colors"
-                        id="warning-pwd-input"
-                        required
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-3 text-slate-400 hover:text-slate-600 transition-colors p-1"
-                        title={showPassword ? "Hide Password" : "Show Password"}
-                        id="warning-pwd-toggle-btn"
-                      >
-                        {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                      </button>
-                    </div>
-
-                    {verifyError && (
-                      <div className="p-3 bg-rose-50/80 border border-rose-100 rounded-xl text-rose-600 text-xs font-semibold leading-relaxed text-center" id="warning-error-msg">
-                        {verifyError}
-                      </div>
-                    )}
+                    <span className="inline-flex items-center px-3.5 py-1 rounded-full text-[10px] sm:text-[11px] font-extrabold bg-rose-50 text-rose-600 border border-rose-200 tracking-wider uppercase" id="warning-badge-pill">
+                      Irreversible Account Deletion
+                    </span>
                   </div>
-                )}
 
-                {/* Buttons Row */}
-                <div className="flex flex-col sm:flex-row gap-3 pt-2" id="warning-buttons-row">
-                  <button
-                    type="button"
-                    onClick={() => setActiveModal(null)}
-                    className="w-full sm:flex-1 py-3.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 hover:text-slate-900 font-bold text-sm rounded-2xl transition-all cursor-pointer min-h-[48px]"
-                    id="warning-back-btn"
-                  >
-                    Back
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleConfirmAction}
-                    disabled={isVerifying}
-                    className="w-full sm:flex-1 py-3.5 bg-[#203d36] hover:bg-black disabled:bg-[#203d36]/70 text-white font-bold text-sm rounded-2xl transition-all cursor-pointer flex items-center justify-center gap-2 min-h-[48px]"
-                    id="warning-confirm-btn"
-                  >
-                    {isVerifying ? (
-                      <>
-                        <RefreshCw className="w-4 h-4 animate-spin" />
-                        <span>Verifying...</span>
-                      </>
-                    ) : (
-                      <span>Delete Account</span>
-                    )}
-                  </button>
+                  {/* Warning Copy */}
+                  <div className="space-y-2.5" id="warning-copy-section">
+                    <h3 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight leading-snug px-2" id="warning-headline">
+                      Are you sure you want to delete your account?
+                    </h3>
+                    <p className="text-xs sm:text-sm text-slate-500 leading-relaxed max-w-sm mx-auto font-medium" id="warning-description">
+                      By deleting your account you will permanently lose all sowed seeds, companion achievements, and notes. This action cannot be undone.
+                    </p>
+                  </div>
+
+                  {/* Verification password inputs (If firebase active and not Google OAuth) */}
+                  {firebaseActive && authProvider !== 'google' && (
+                    <div className="bg-slate-50 p-4 sm:p-5 rounded-2xl border border-slate-200 text-left space-y-3.5" id="warning-verification-box">
+                      <div className="flex items-center justify-between text-xs font-semibold" id="warning-verification-labels">
+                        <label className="text-slate-700 font-bold" id="warning-pwd-label">Confirm Master Password</label>
+                        <button
+                          type="button"
+                          onClick={handleRequestOtp}
+                          disabled={otpLoading}
+                          className="text-rose-600 hover:text-rose-700 font-bold hover:underline transition-all cursor-pointer text-xs"
+                          id="warning-otp-btn"
+                        >
+                          {otpLoading ? "Sending OTP..." : "Forgot password?"}
+                        </button>
+                      </div>
+                      
+                      <div className="relative flex items-center" id="warning-pwd-input-wrapper">
+                        <input
+                          type={showPassword ? "text" : "password"}
+                          value={passwordInput}
+                          onChange={(e) => setPasswordInput(e.target.value)}
+                          placeholder="••••••••••••"
+                          className="w-full bg-white border border-slate-300 text-sm pl-4 pr-10 py-3 rounded-xl focus:outline-none focus:border-rose-600 text-slate-800 placeholder-slate-400 font-mono transition-colors"
+                          id="warning-pwd-input"
+                          required
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          className="absolute right-3 text-slate-400 hover:text-slate-600 transition-colors p-1"
+                          title={showPassword ? "Hide Password" : "Show Password"}
+                          id="warning-pwd-toggle-btn"
+                        >
+                          {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        </button>
+                      </div>
+
+                      {verifyError && (
+                        <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-600 text-xs font-semibold leading-relaxed text-center" id="warning-error-msg">
+                          {verifyError}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Buttons Row */}
+                  <div className="flex flex-col sm:flex-row gap-3 pt-2" id="warning-buttons-row">
+                    <button
+                      type="button"
+                      onClick={() => setActiveModal(null)}
+                      className="w-full sm:flex-1 py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-sm rounded-2xl transition-all cursor-pointer min-h-[48px]"
+                      id="warning-back-btn"
+                    >
+                      Back
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleConfirmAction}
+                      disabled={isVerifying}
+                      className="w-full sm:flex-1 py-3.5 bg-rose-600 hover:bg-rose-700 disabled:bg-rose-600/60 active:scale-[0.98] text-white font-black text-sm rounded-2xl transition-all cursor-pointer flex items-center justify-center gap-2 min-h-[48px] shadow-lg shadow-rose-600/25"
+                      id="warning-confirm-btn"
+                    >
+                      {isVerifying ? (
+                        <>
+                          <RefreshCw className="w-4 h-4 animate-spin" />
+                          <span>Verifying...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Trash2 className="w-4 h-4" />
+                          <span>Delete Account</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
                 </div>
               </motion.div>
             )

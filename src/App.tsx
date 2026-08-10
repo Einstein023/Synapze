@@ -52,6 +52,7 @@ function GardenAppContent() {
   const [currentTab, setCurrentTab] = useState<'dashboard' | 'capture' | 'editor' | 'companion' | 'vault' | 'settings' | 'admin'>('dashboard');
   const [editingSeedlingId, setEditingSeedlingId] = useState<string | null>(null);
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
+  const [showDeleteAccountInSettings, setShowDeleteAccountInSettings] = useState(false);
   const [showLogoLoader, setShowLogoLoader] = useState(false);
 
   const handleSignOut = async () => {
@@ -125,12 +126,24 @@ function GardenAppContent() {
       case 'companion':
         return <CompanionCenter />;
       case 'vault':
-        return <VaultArchive onNavigateToEditor={(id) => handleEditNote(id)} />;
+        return (
+          <VaultArchive 
+            onNavigateToEditor={(id) => handleEditNote(id)} 
+            onNavigateToDeleteAccount={() => {
+              setShowDeleteAccountInSettings(true);
+              setCurrentTab('settings');
+            }}
+          />
+        );
       case 'settings':
         return (
           <SettingsView 
             onNavigateToLanding={() => { setViewState('landing'); setCurrentTab('dashboard'); }} 
-            onToggleDeletePage={setIsDeletingAccount}
+            onToggleDeletePage={(active) => {
+              setIsDeletingAccount(active);
+              if (!active) setShowDeleteAccountInSettings(false);
+            }}
+            initialShowDelete={showDeleteAccountInSettings}
           />
         );
       case 'admin':
@@ -197,11 +210,11 @@ function GardenAppContent() {
   return (
     <div className="min-h-screen bg-[#faf9f6] flex flex-col font-sans transition-all duration-300">
       
-      {/* Dynamic Offline notice alert ticker bar */}
+      {/* Offline status indicator banner */}
       {isOffline && (
-        <div className="bg-amber-500 text-slate-950 font-mono text-[11px] font-bold py-2 px-4 shadow-sm text-center flex items-center justify-center gap-2 relative z-50 select-none">
-          <SignalZero className="w-4.5 h-4.5 animate-pulse" />
-          <span>🔌 GARDEN OFFLINE MODE ACTIVE: Changes are buffered locally and will synchronize automatically when online connection is restored.</span>
+        <div className="bg-amber-500/90 text-slate-950 font-medium text-xs sm:text-sm py-2 px-4 text-center flex items-center justify-center gap-2 sticky top-0 z-50 backdrop-blur-xs shadow-xs">
+          <SignalZero className="w-4 h-4 shrink-0" />
+          <span>You're offline — your work is safely saved on your device.</span>
         </div>
       )}
 
@@ -519,7 +532,7 @@ function GardenAppContent() {
         )}
 
         {/* Primary central canvas spacer */}
-        <main className={`flex-1 overflow-y-auto custom-scrollbar scroll-smooth ${isDeletingAccount ? '' : 'md:ml-64'} ${currentTab === 'editor' ? 'p-0 bg-white' : 'p-6 md:p-8'}`}>
+        <main className={`flex-1 overflow-y-auto custom-scrollbar scroll-smooth min-w-0 max-w-full overflow-x-hidden ${isDeletingAccount ? '' : 'md:ml-64'} ${currentTab === 'editor' ? 'p-0 bg-white' : 'p-6 md:p-8'}`}>
           <AnimatePresence mode="wait">
             <motion.div
               key={currentTab}
@@ -527,7 +540,7 @@ function GardenAppContent() {
               animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
               exit={{ opacity: 0, y: -12, filter: 'blur(3px)' }}
               transition={{ duration: 0.22, ease: "easeInOut" }}
-              className="h-full w-full"
+              className="h-full w-full min-w-0 max-w-full overflow-x-hidden"
             >
               {renderTabContent()}
             </motion.div>

@@ -1,10 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { useGarden } from '../lib/gardenState';
 import { SeedlingNode, SeedlingStatus } from '../types';
-import { Search, Trash2, FolderClosed, Archive, FileText, Check, ArrowUpRight, FolderHeart, Sprout } from 'lucide-react';
+import { Search, Trash2, FolderClosed, Archive, FileText, Check, ArrowUpRight, FolderHeart, Sprout, AlertTriangle, X } from 'lucide-react';
 import { stripFormatting } from '../lib/editorUtils';
 
-export const VaultArchive: React.FC<{ onNavigateToEditor: (id: string | null) => void }> = ({ onNavigateToEditor }) => {
+interface VaultArchiveProps {
+  onNavigateToEditor: (id: string | null) => void;
+  onNavigateToDeleteAccount?: () => void;
+}
+
+export const VaultArchive: React.FC<VaultArchiveProps> = ({ onNavigateToEditor, onNavigateToDeleteAccount }) => {
   const { seedlings, deleteSeedling, triggerPushNotification, addSeedling, updateSeedling } = useGarden();
   const [searchVal, setSearchVal] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('archived'); // Default to Archived
@@ -146,9 +151,9 @@ export const VaultArchive: React.FC<{ onNavigateToEditor: (id: string | null) =>
           <div className="flex gap-2">
             <button
               onClick={handlePurgeArchived}
-              className="flex-1 py-2.5 bg-slate-100 hover:bg-rose-50 border border-slate-200/40 hover:border-rose-200 text-rose-600 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center justify-center gap-1.5"
+              className="w-full py-2.5 bg-slate-100 hover:bg-slate-200/70 border border-slate-200/40 text-slate-700 rounded-xl text-xs font-semibold transition-all cursor-pointer flex items-center justify-center gap-1.5"
             >
-              <Trash2 className="w-3.5 h-3.5" />
+              <Trash2 className="w-3.5 h-3.5 text-slate-500" />
               Empty Archive
             </button>
           </div>
@@ -310,91 +315,138 @@ export const VaultArchive: React.FC<{ onNavigateToEditor: (id: string | null) =>
 
       </div>
 
+
+
+      {/* High-Visibility Purge Confirmation Modal */}
       {isPurgeConfirmOpen && (
-        <div className="fixed inset-0 bg-slate-950/20 backdrop-blur-xl flex items-center justify-center p-4 z-50 pointer-events-auto animate-fade-in">
-          <div className="bg-white border border-slate-200/80 rounded-[1.8rem] w-full max-w-md overflow-hidden shadow-2xl p-6 text-left space-y-5">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-rose-50 border border-rose-100 flex items-center justify-center text-rose-500 shrink-0">
-                <Trash2 className="w-5 h-5" />
+        <div className="fixed inset-0 bg-slate-950/75 backdrop-blur-md flex items-center justify-center p-4 sm:p-6 z-[9999] overflow-y-auto animate-fade-in">
+          <div className="bg-white border border-slate-200/90 rounded-3xl w-full max-w-sm sm:max-w-md shadow-2xl overflow-hidden relative my-auto text-left">
+            
+            {/* Top Red Alert Gradient */}
+            <div className="h-2 bg-gradient-to-r from-rose-500 via-rose-600 to-amber-500 w-full" />
+
+            {/* Close Button Top Right */}
+            <button
+              type="button"
+              onClick={() => setIsPurgeConfirmOpen(false)}
+              className="absolute top-4 right-4 p-1.5 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
+              title="Close"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="p-6 sm:p-7 space-y-5">
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 rounded-2xl bg-rose-100/80 border border-rose-200 flex items-center justify-center text-rose-600 shrink-0 shadow-xs">
+                  <AlertTriangle className="w-6 h-6" />
+                </div>
+                <div className="pr-6">
+                  <h3 className="font-extrabold text-lg sm:text-xl text-slate-900 tracking-tight leading-snug">
+                    Empty Archive Vault?
+                  </h3>
+                  <p className="text-slate-500 text-xs sm:text-sm font-medium mt-1 leading-relaxed">
+                    You are about to permanently purge all {archivedNotes.length} archived seedlings.
+                  </p>
+                </div>
               </div>
-              <div className="space-y-0.5">
-                <h3 className="font-serif text-lg font-bold text-slate-900 leading-tight">
-                  Empty Archive Vault?
-                </h3>
-                <p className="text-xs text-slate-500">
-                  Are you absolutely sure you want to permanently delete all {archivedNotes.length} archived seedlings?
+              
+              <div className="p-3.5 bg-slate-50 border border-slate-200/80 rounded-2xl">
+                <p className="text-xs text-rose-600 font-semibold leading-relaxed">
+                  ⚠ Irreversible Action: All {archivedNotes.length} archived items will be permanently erased from storage.
                 </p>
               </div>
-            </div>
-            
-            <p className="text-xs text-slate-500 leading-relaxed bg-slate-50 p-3 rounded-xl border border-slate-100 font-mono">
-              This action is irreversible. All selected archive nodes will be permanently composted and removed from database storage.
-            </p>
 
-            <div className="flex gap-3 pt-2">
-              <button
-                onClick={() => setIsPurgeConfirmOpen(false)}
-                className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl text-xs transition-colors cursor-pointer text-center"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={async () => {
-                  setIsPurgeConfirmOpen(false);
-                  for (const note of archivedNotes) {
-                    await deleteSeedling(note.id);
-                  }
-                  triggerPushNotification('Purge Successful', 'Deleted archived notes permanently.', 'system');
-                }}
-                className="flex-1 py-2.5 bg-rose-600 hover:bg-rose-700 text-white font-semibold rounded-xl text-xs transition-colors cursor-pointer text-center shadow-xs"
-              >
-                Yes, Empty Archive
-              </button>
+              <div className="grid grid-cols-2 gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsPurgeConfirmOpen(false)}
+                  className="w-full py-3.5 px-4 bg-slate-100 hover:bg-slate-200/80 text-slate-700 font-bold rounded-2xl text-xs sm:text-sm transition-all cursor-pointer text-center flex items-center justify-center min-h-[48px]"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    setIsPurgeConfirmOpen(false);
+                    for (const note of archivedNotes) {
+                      await deleteSeedling(note.id);
+                    }
+                    triggerPushNotification('Purge Successful', 'Deleted archived notes permanently.', 'system');
+                  }}
+                  className="w-full py-3.5 px-4 bg-rose-600 hover:bg-rose-700 active:scale-[0.98] text-white font-bold rounded-2xl text-xs sm:text-sm transition-all shadow-md shadow-rose-600/25 cursor-pointer text-center flex items-center justify-center gap-2 min-h-[48px]"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  <span>Purge Vault</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>
       )}
 
+      {/* High-Visibility Single Note Delete Modal */}
       {noteToDelete && (
-        <div className="fixed inset-0 bg-slate-950/20 backdrop-blur-xl flex items-center justify-center p-4 z-50 pointer-events-auto animate-fade-in">
-          <div className="bg-white border border-slate-200/80 rounded-[1.8rem] w-full max-w-md overflow-hidden shadow-2xl p-6 text-left space-y-5 animate-fade-in">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-rose-50 border border-rose-100 flex items-center justify-center text-rose-500 shrink-0">
-                <Trash2 className="w-5 h-5" />
+        <div className="fixed inset-0 bg-slate-950/75 backdrop-blur-md flex items-center justify-center p-4 sm:p-6 z-[9999] overflow-y-auto animate-fade-in">
+          <div className="bg-white border border-slate-200/90 rounded-3xl w-full max-w-sm sm:max-w-md shadow-2xl overflow-hidden relative my-auto text-left">
+            
+            {/* Top Red Alert Gradient */}
+            <div className="h-2 bg-gradient-to-r from-rose-500 via-rose-600 to-amber-500 w-full" />
+
+            {/* Close Button Top Right */}
+            <button
+              type="button"
+              onClick={() => setNoteToDelete(null)}
+              className="absolute top-4 right-4 p-1.5 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
+              title="Close"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="p-6 sm:p-7 space-y-5">
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 rounded-2xl bg-rose-100/80 border border-rose-200 flex items-center justify-center text-rose-600 shrink-0 shadow-xs">
+                  <AlertTriangle className="w-6 h-6" />
+                </div>
+                <div className="pr-6">
+                  <h3 className="font-extrabold text-lg sm:text-xl text-slate-900 tracking-tight leading-snug">
+                    Delete Note?
+                  </h3>
+                  <p className="text-slate-500 text-xs sm:text-sm font-medium mt-1 leading-relaxed">
+                    This item will be permanently removed from your vault.
+                  </p>
+                </div>
               </div>
-              <div className="space-y-0.5">
-                <h3 className="font-serif text-lg font-bold text-slate-900 leading-tight">
-                  Delete Seedling permanently?
-                </h3>
-                <p className="text-xs text-slate-500">
-                  CRITICAL ACTION
+
+              <div className="p-3.5 bg-slate-50 border border-slate-200/80 rounded-2xl">
+                <p className="text-slate-400 text-[10px] font-mono uppercase tracking-wider font-bold mb-1">Note to be deleted:</p>
+                <p className="text-slate-800 font-bold text-sm truncate">
+                  "{noteToDelete.title || 'Untitled Note'}"
                 </p>
               </div>
-            </div>
 
-            <p className="text-slate-600 text-xs leading-relaxed font-sans">
-              Are you sure you want to permanently delete the seedling <strong className="text-slate-900 font-semibold font-serif">"{noteToDelete.title || 'Untitled Note'}"</strong>? This will retire the note forever and cannot be undone.
-            </p>
-
-            <div className="flex gap-3 pt-2 text-xs font-mono">
-              <button
-                onClick={() => setNoteToDelete(null)}
-                className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-xl transition-colors cursor-pointer text-center"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={async () => {
-                  const id = noteToDelete.id;
-                  const title = noteToDelete.title || 'Untitled Note';
-                  setNoteToDelete(null);
-                  await deleteSeedling(id);
-                  triggerPushNotification('Note Deleted', `"${title}" has been deleted.`, 'system');
-                }}
-                className="flex-1 py-2.5 bg-rose-600 hover:bg-rose-700 text-white font-semibold rounded-xl transition-colors cursor-pointer text-center shadow-xs"
-              >
-                Delete
-              </button>
+              <div className="grid grid-cols-2 gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setNoteToDelete(null)}
+                  className="w-full py-3.5 px-4 bg-slate-100 hover:bg-slate-200/80 text-slate-700 font-bold rounded-2xl text-xs sm:text-sm transition-all cursor-pointer text-center flex items-center justify-center min-h-[48px]"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const id = noteToDelete.id;
+                    const title = noteToDelete.title || 'Untitled Note';
+                    setNoteToDelete(null);
+                    await deleteSeedling(id);
+                    triggerPushNotification('Note Deleted', `"${title}" has been deleted.`, 'system');
+                  }}
+                  className="w-full py-3.5 px-4 bg-rose-600 hover:bg-rose-700 active:scale-[0.98] text-white font-bold rounded-2xl text-xs sm:text-sm transition-all shadow-md shadow-rose-600/25 cursor-pointer text-center flex items-center justify-center gap-2 min-h-[48px]"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  <span>Delete Note</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>

@@ -1,6 +1,15 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { onAuthStateChanged } from 'firebase/auth';
 import { 
+  doc, 
+  setDoc, 
+  getDoc, 
+  deleteDoc, 
+  collection, 
+  getDocs, 
+  writeBatch 
+} from 'firebase/firestore';
+import { 
   GardenerProfile, 
   SeedlingNode, 
   ActivityMetric, 
@@ -129,7 +138,7 @@ interface GardenContextType {
   firebaseActive: boolean;
   setOfflineMode: (offline: boolean) => void;
   updateProfile: (profileUpdates: Partial<GardenerProfile>) => Promise<void>;
-  addSeedling: (seedling: Omit<SeedlingNode, 'id' | 'userId' | 'createdAt' | 'updatedAt'>) => Promise<string>;
+  addSeedling: (seedling: Omit<SeedlingNode, 'id' | 'userId' | 'createdAt' | 'updatedAt'> & { id?: string }) => Promise<string>;
   updateSeedling: (id: string, updates: Partial<SeedlingNode>) => Promise<void>;
   deleteSeedling: (id: string) => Promise<void>;
   triggerPushNotification: (title: string, body: string, type?: NotificationAlert['type']) => void;
@@ -245,7 +254,13 @@ export const GardenProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [seedlings, setSeedlings] = useState<SeedlingNode[]>([]);
   const [activities, setActivities] = useState<ActivityMetric[]>([]);
   const [notifications, setNotifications] = useState<NotificationAlert[]>([]);
-  const [isOffline, setIsOffline] = useState<boolean>(typeof navigator !== 'undefined' ? !navigator.onLine : false);
+  const [isOffline, setIsOffline] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('synapze_offline_test');
+      return !navigator.onLine;
+    }
+    return false;
+  });
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(true);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
@@ -286,9 +301,9 @@ export const GardenProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setLoading(false);
   }, []);
 
-  // Monitor live Firebase Auth transitions if firebase is active and online
+  // Monitor live Firebase Auth transitions if firebase is active
   useEffect(() => {
-    if (!isFirebaseConfigured || isOffline) return;
+    if (!isFirebaseConfigured) return;
 
     const unsubscribe = onAuthStateChanged(auth, async (user: any) => {
       if (user) {
@@ -341,8 +356,10 @@ export const GardenProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         localStorage.setItem('synapze_author_uid', user.uid);
         localStorage.setItem('synapze_author_email', user.email || '');
         
-        // Load documents from Firestore
-        await pullFirestoreData(user.uid);
+        // Load documents from Firestore if online
+        if (!isOffline) {
+          await pullFirestoreData(user.uid);
+        }
       } else {
         // Fall back to local if signed out
         setIsAuthenticated(false);
@@ -357,29 +374,59 @@ export const GardenProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     return () => unsubscribe();
   }, [isOffline]);
 
-  // Handle native online/offline change events
+  // Handle native online/offline change events cleanly
   useEffect(() => {
+    let offlineTimer: NodeJS.Timeout | null = null;
+
     const handleOnline = () => {
-      setOfflineMode(false);
+      if (offlineTimer) {
+        clearTimeout(offlineTimer);
+        offlineTimer = null;
+      }
+      localStorage.removeItem('synapze_offline_test');
+      setIsOffline(prev => {
+        if (prev) {
+          triggerPushNotification('Restored Online', 'Connected back to the server.', 'system');
+          if (isAuthenticated && currentUserUid !== 'garden-guest') {
+            syncLocalToFirestore(currentUserUid);
+          }
+        }
+        return false;
+      });
     };
+
     const handleOffline = () => {
-      setOfflineMode(true);
+      if (!offlineTimer) {
+        offlineTimer = setTimeout(() => {
+          if (typeof navigator !== 'undefined' && !navigator.onLine) {
+            setIsOffline(true);
+            triggerPushNotification('Offline Mode Active', 'Network disconnected. Changes are saved locally.', 'system');
+          }
+          offlineTimer = null;
+        }, 120000); // 2 minutes grace period
+      }
     };
 
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
 
-    // Dynamic initial sync verification
-    const currentOffline = !navigator.onLine;
-    if (currentOffline !== isOffline) {
-      setIsOffline(currentOffline);
+    // Initial sync check on mount
+    if (typeof navigator !== 'undefined') {
+      if (navigator.onLine) {
+        handleOnline();
+      } else {
+        handleOffline();
+      }
     }
 
     return () => {
+      if (offlineTimer) {
+        clearTimeout(offlineTimer);
+      }
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };
-  }, [isOffline, isAuthenticated, currentUserUid]);
+  }, [isAuthenticated, currentUserUid]);
 
   // Automatically check & update active learning streak on mount or profile change
   useEffect(() => {
@@ -561,9 +608,11 @@ export const GardenProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     } catch (error) {
       console.warn("Soft recovery - Firestore syncing failed, falling back to cached local storage:", error);
-      setIsOffline(true);
       recoveryLocalStorage(uid);
-      triggerPushNotification('Offline Mode', 'Database unreachable. Using local cache.', 'system');
+      if (typeof navigator !== 'undefined' && !navigator.onLine) {
+        setIsOffline(true);
+        triggerPushNotification('Offline Mode', 'Database unreachable. Using local cache.', 'system');
+      }
     }
   };
 
@@ -823,10 +872,9 @@ export const GardenProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       
       // Background save to firebase if online
       if (isFirebaseConfigured && !isOffline && currentUserUid !== 'garden-guest') {
-        import('firebase/firestore').then(async ({ doc, setDoc }) => {
-          await setDoc(doc(db, 'users', currentUserUid), updated).catch(err => {
-            handleFirestoreError(err, OperationType.WRITE, `users/${currentUserUid}`);
-          });
+        const pRef = doc(db, 'users', currentUserUid);
+        setDoc(pRef, updated).catch(err => {
+          handleFirestoreError(err, OperationType.WRITE, `users/${currentUserUid}`);
         });
       }
       return updated;
@@ -834,8 +882,8 @@ export const GardenProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   };
 
   // Seedling Create API
-  const addSeedling = async (seedling: Omit<SeedlingNode, 'id' | 'userId' | 'createdAt' | 'updatedAt'>) => {
-    const newId = 'seed_' + Math.random().toString(36).substring(2, 11);
+  const addSeedling = async (seedling: Omit<SeedlingNode, 'id' | 'userId' | 'createdAt' | 'updatedAt'> & { id?: string }) => {
+    const newId = seedling.id || ('seed_' + Math.random().toString(36).substring(2, 11));
     const newSeed: SeedlingNode = {
       ...seedling,
       id: newId,
@@ -845,6 +893,9 @@ export const GardenProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     };
 
     setSeedlings(prev => {
+      if (newId && prev.some(s => s.id === newId)) {
+        return prev.map(s => s.id === newId ? { ...s, ...newSeed } : s);
+      }
       const updated = [newSeed, ...prev];
       localStorage.setItem(`synapze_seed_${currentUserUid}`, JSON.stringify(updated));
       return updated;
@@ -854,17 +905,12 @@ export const GardenProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     awardCompanionXp(15);
     logActivity(`Planted seedling: "${newSeed.title}"`, 15);
 
-    // Save to Firestore in background
+    // Save to Firestore asynchronously in background without blocking local return
     if (isFirebaseConfigured && !isOffline && currentUserUid !== 'garden-guest') {
-      try {
-        const { doc, setDoc } = await import('firebase/firestore');
-        const sRef = doc(db, 'users', currentUserUid, 'seedlings', newId);
-        await setDoc(sRef, newSeed).catch(err => {
-          handleFirestoreError(err, OperationType.WRITE, `users/${currentUserUid}/seedlings/${newId}`);
-        });
-      } catch (err) {
-        console.warn("Background firestore save failed for new seedling", err);
-      }
+      const sRef = doc(db, 'users', currentUserUid, 'seedlings', newId);
+      setDoc(sRef, newSeed).catch(err => {
+        handleFirestoreError(err, OperationType.WRITE, `users/${currentUserUid}/seedlings/${newId}`);
+      });
     }
 
     triggerPushNotification('Note Sown', `"${newSeed.title}" created.`, 'plant');
@@ -905,10 +951,9 @@ export const GardenProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       
       const updatedDoc = updated.find(s => s.id === id);
       if (updatedDoc && isFirebaseConfigured && !isOffline && currentUserUid !== 'garden-guest') {
-        import('firebase/firestore').then(async ({ doc, setDoc }) => {
-          await setDoc(doc(db, 'users', currentUserUid, 'seedlings', id), updatedDoc).catch(err => {
-            handleFirestoreError(err, OperationType.WRITE, `users/${currentUserUid}/seedlings/${id}`);
-          });
+        const sRef = doc(db, 'users', currentUserUid, 'seedlings', id);
+        setDoc(sRef, updatedDoc).catch(err => {
+          handleFirestoreError(err, OperationType.WRITE, `users/${currentUserUid}/seedlings/${id}`);
         });
       }
       return updated;
@@ -929,10 +974,9 @@ export const GardenProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       }
 
       if (isFirebaseConfigured && !isOffline && currentUserUid !== 'garden-guest') {
-        import('firebase/firestore').then(async ({ doc, deleteDoc }) => {
-          await deleteDoc(doc(db, 'users', currentUserUid, 'seedlings', id)).catch(err => {
-            handleFirestoreError(err, OperationType.DELETE, `users/${currentUserUid}/seedlings/${id}`);
-          });
+        const sRef = doc(db, 'users', currentUserUid, 'seedlings', id);
+        deleteDoc(sRef).catch(err => {
+          handleFirestoreError(err, OperationType.DELETE, `users/${currentUserUid}/seedlings/${id}`);
         });
       }
       return updated;
@@ -1007,10 +1051,9 @@ export const GardenProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     });
 
     if (isFirebaseConfigured && !isOffline && currentUserUid !== 'garden-guest') {
-      import('firebase/firestore').then(async ({ doc, setDoc }) => {
-        await setDoc(doc(db, 'users', currentUserUid, 'activities', newAct.id), newAct).catch(err => {
-          handleFirestoreError(err, OperationType.WRITE, `users/${currentUserUid}/activities/${newAct.id}`);
-        });
+      const aRef = doc(db, 'users', currentUserUid, 'activities', newAct.id);
+      setDoc(aRef, newAct).catch(err => {
+        handleFirestoreError(err, OperationType.WRITE, `users/${currentUserUid}/activities/${newAct.id}`);
       });
     }
   };

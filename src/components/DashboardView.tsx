@@ -707,29 +707,29 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       </div>
 
       {/* 4. CULTIVATE YOUR KNOWLEDGE - STATS HERO BLOCK (BOTTOM SECTION) */}
-      <div className="bg-[#f0ece1]/50 border border-slate-200/50 rounded-[2rem] p-6 md:p-10 text-left grid grid-cols-1 lg:grid-cols-12 gap-8 items-center relative overflow-hidden">
+      <div className="bg-[#f0ece1]/50 border border-slate-200/50 rounded-2xl sm:rounded-[2rem] p-5 sm:p-6 md:p-8 lg:p-10 text-left grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 items-center relative overflow-hidden">
         
         {/* Decorative background glows */}
         <div className="absolute top-1/2 left-1/4 w-32 h-32 bg-emerald-500/5 rounded-full blur-2xl pointer-events-none" />
 
         {/* Text and stats graphics */}
-        <div className="lg:col-span-7 space-y-6 z-10">
-          <div className="space-y-2">
-            <h2 className="font-serif text-3xl md:text-4xl font-extrabold text-[#203d36] tracking-tight leading-tight">
-              Cultivate your <br />
+        <div className="lg:col-span-7 space-y-4 sm:space-y-6 z-10">
+          <div className="space-y-1.5 sm:space-y-2">
+            <h2 className="font-serif text-2xl sm:text-3xl md:text-4xl font-extrabold text-[#203d36] tracking-tight leading-tight">
+              Cultivate your <br className="hidden sm:inline" />
               <span className="text-emerald-800 italic font-medium">Knowledge.</span>
             </h2>
-            <p className="text-[#3c4a42] text-sm leading-relaxed max-w-lg">
+            <p className="text-[#3c4a42] text-xs sm:text-sm leading-relaxed max-w-lg">
               Every note you take is a seed. In time, they grow into a robust forest of ideas that you can navigate with ease.
             </p>
           </div>
 
           {/* Micro bars list chart representing daily activity/gains */}
-          <div className="pt-4 flex items-end gap-3.5 h-24">
+          <div className="pt-2 sm:pt-4 flex items-end gap-2 sm:gap-3.5 h-20 sm:h-24">
             {barStats.map((stat, index) => (
-              <div key={index} className="flex flex-col items-center gap-1.5 flex-1">
+              <div key={index} className="flex flex-col items-center gap-1 sm:gap-1.5 flex-1">
                 {/* Bar */}
-                <div className="w-full bg-slate-200/70 rounded-md h-16 relative overflow-hidden">
+                <div className="w-full bg-slate-200/70 rounded-md h-12 sm:h-16 relative overflow-hidden">
                   <motion.div 
                     initial={{ height: 0 }}
                     animate={{ height: `${stat.heightPercentage}%` }}
@@ -737,7 +737,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                     className="absolute bottom-0 left-0 right-0 bg-[#203d36] rounded-md"
                   />
                 </div>
-                <span className="text-[9px] font-mono font-bold text-slate-400">
+                <span className="text-[8px] sm:text-[9px] font-mono font-bold text-slate-400">
                   {stat.label}
                 </span>
               </div>
@@ -747,7 +747,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
         {/* Digital Forest Beautiful visual design (CSS canvas/representation) */}
         <div className="lg:col-span-5 w-full h-full flex justify-center items-center z-10 relative">
-          <div className="w-full h-64 md:h-80 rounded-[1.8rem] bg-[#203d36] border border-white/5 shadow-2xl relative group overflow-hidden flex flex-col justify-between p-4">
+          <div className="w-full h-56 sm:h-64 md:h-72 lg:h-80 rounded-2xl md:rounded-[1.8rem] bg-[#203d36] border border-white/5 shadow-2xl relative group overflow-hidden flex flex-col justify-between p-3 sm:p-4">
             
             {/* Soft inner stars/leaves overlay */}
             <div className="absolute inset-0 bg-radial-at-t from-emerald-500/10 to-transparent pointer-events-none" />
@@ -776,17 +776,16 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 onClick={() => {
                   setActiveGraphFilter('all');
                 }}
-                className={`absolute w-20 h-20 rounded-full border flex flex-col items-center justify-center text-white shadow-xl z-10 cursor-pointer select-none transition-all ${
+                className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-16 h-16 sm:w-20 sm:h-20 rounded-full border flex flex-col items-center justify-center text-white shadow-xl z-10 cursor-pointer select-none transition-all ${
                   activeGraphFilter === 'all'
                     ? 'bg-emerald-800/95 border-[#fdda64] scale-105'
                     : 'bg-emerald-950/80 border-emerald-500/30 opacity-75 hover:opacity-100 hover:scale-105'
                 }`}
-                style={{ left: 'calc(50% - 40px)', top: 'calc(50% - 40px)' }}
                 animate={activeGraphFilter === 'all' ? { scale: [1.05, 1.1, 1.05] } : { scale: 1 }}
                 transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
               >
-                <div className="w-14 h-14 rounded-full bg-emerald-700/80 flex items-center justify-center">
-                  <Sprout className="w-7 h-7 text-[#fdda64]" />
+                <div className="w-11 h-11 sm:w-14 sm:h-14 rounded-full bg-emerald-700/80 flex items-center justify-center">
+                  <Sprout className="w-5 h-5 sm:w-7 sm:h-7 text-[#fdda64]" />
                 </div>
               </motion.div>
 
@@ -795,12 +794,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 onClick={() => {
                   setActiveGraphFilter('ideas');
                 }}
-                className={`absolute px-2.5 py-1.5 rounded-xl flex items-center gap-1.5 shadow-md font-mono text-[9px] z-10 cursor-pointer border select-none transition-all ${
+                className={`absolute px-2 py-1 sm:px-2.5 sm:py-1.5 rounded-xl flex items-center gap-1.5 shadow-md font-mono text-[8px] sm:text-[9px] z-10 cursor-pointer border select-none transition-all ${
                   activeGraphFilter === 'ideas' 
                     ? 'bg-emerald-500 border-[#fdda64] text-white scale-110 shadow-lg shadow-emerald-500/20' 
                     : 'bg-[#183a2b] border-emerald-500/40 text-emerald-200 hover:bg-[#1f4c39] hover:scale-105'
                 }`}
-                style={{ left: '12%', top: '16%' }}
+                style={{ left: '6%', top: '14%' }}
                 animate={activeGraphFilter === 'ideas' ? { scale: [1.1, 1.15, 1.1] } : { y: [0, -4, 0] }}
                 transition={activeGraphFilter === 'ideas' ? { duration: 1.5, repeat: Infinity } : { duration: 3, repeat: Infinity, ease: 'easeInOut' }}
               >
@@ -813,12 +812,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 onClick={() => {
                   setActiveGraphFilter('notes');
                 }}
-                className={`absolute px-2.5 py-1.5 rounded-xl flex items-center gap-1.5 shadow-md font-mono text-[9px] z-10 cursor-pointer border select-none transition-all ${
+                className={`absolute px-2 py-1 sm:px-2.5 sm:py-1.5 rounded-xl flex items-center gap-1.5 shadow-md font-mono text-[8px] sm:text-[9px] z-10 cursor-pointer border select-none transition-all ${
                   activeGraphFilter === 'notes' 
                     ? 'bg-sky-500 border-[#fdda64] text-white scale-110 shadow-lg shadow-sky-500/20' 
                     : 'bg-[#0f2d3a] border-sky-500/40 text-sky-200 hover:bg-[#174356] hover:scale-105'
                 }`}
-                style={{ right: '12%', top: '16%' }}
+                style={{ right: '6%', top: '14%' }}
                 animate={activeGraphFilter === 'notes' ? { scale: [1.1, 1.15, 1.1] } : { y: [0, -5, 0] }}
                 transition={activeGraphFilter === 'notes' ? { duration: 1.5, repeat: Infinity } : { duration: 3.5, repeat: Infinity, ease: 'easeInOut', delay: 0.5 }}
               >
@@ -831,12 +830,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 onClick={() => {
                   setActiveGraphFilter('tasks');
                 }}
-                className={`absolute px-2.5 py-1.5 rounded-xl flex items-center gap-1.5 shadow-md font-mono text-[9px] z-10 cursor-pointer border select-none transition-all ${
+                className={`absolute px-2 py-1 sm:px-2.5 sm:py-1.5 rounded-xl flex items-center gap-1.5 shadow-md font-mono text-[8px] sm:text-[9px] z-10 cursor-pointer border select-none transition-all ${
                   activeGraphFilter === 'tasks' 
                     ? 'bg-amber-500 border-[#fdda64] text-white scale-110 shadow-lg shadow-amber-500/20' 
                     : 'bg-[#36270b] border-amber-500/40 text-amber-200 hover:bg-[#4d3811] hover:scale-105'
                 }`}
-                style={{ left: '6%', bottom: '24%' }}
+                style={{ left: '4%', bottom: '20%' }}
                 animate={activeGraphFilter === 'tasks' ? { scale: [1.1, 1.15, 1.1] } : { y: [0, -3, 0] }}
                 transition={activeGraphFilter === 'tasks' ? { duration: 1.5, repeat: Infinity } : { duration: 2.8, repeat: Infinity, ease: 'easeInOut', delay: 0.2 }}
               >
@@ -849,12 +848,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 onClick={() => {
                   setActiveGraphFilter('archive');
                 }}
-                className={`absolute px-2.5 py-1.5 rounded-xl flex items-center gap-1.5 shadow-md font-mono text-[9px] z-10 cursor-pointer border select-none transition-all ${
+                className={`absolute px-2 py-1 sm:px-2.5 sm:py-1.5 rounded-xl flex items-center gap-1.5 shadow-md font-mono text-[8px] sm:text-[9px] z-10 cursor-pointer border select-none transition-all ${
                   activeGraphFilter === 'archive' 
                     ? 'bg-indigo-500 border-[#fdda64] text-white scale-110 shadow-lg shadow-indigo-500/20' 
                     : 'bg-[#1c1a3a] border-indigo-500/40 text-indigo-200 hover:bg-[#282554] hover:scale-105'
                 }`}
-                style={{ right: '6%', bottom: '24%' }}
+                style={{ right: '4%', bottom: '20%' }}
                 animate={activeGraphFilter === 'archive' ? { scale: [1.1, 1.15, 1.1] } : { y: [0, -4, 0] }}
                 transition={activeGraphFilter === 'archive' ? { duration: 1.5, repeat: Infinity } : { duration: 4.2, repeat: Infinity, ease: 'easeInOut', delay: 0.8 }}
               >
@@ -865,8 +864,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             </div>
 
             {/* Bottom Status text label inside graph */}
-            <div className="absolute bottom-3 left-0 right-0 text-center select-none z-10">
-              <span className="text-[8px] font-mono tracking-widest text-slate-400 font-bold uppercase bg-slate-950/40 px-2.5 py-1 rounded-full border border-white/5 inline-flex items-center gap-1.5">
+            <div className="absolute bottom-2.5 sm:bottom-3 left-0 right-0 text-center select-none z-10">
+              <span className="text-[7.5px] sm:text-[8px] font-mono tracking-widest text-slate-400 font-bold uppercase bg-slate-950/40 px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full border border-white/5 inline-flex items-center gap-1.5">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                 KNOWLEDGE_ECOSYSTEM_ACTIVE
               </span>
