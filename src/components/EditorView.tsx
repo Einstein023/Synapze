@@ -37,11 +37,13 @@ export const EditorView: React.FC<EditorViewProps> = ({ activeSeedlingId, onBack
   const editorRef = useRef<HTMLDivElement>(null);
   const markdownTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
-  // Track actual active seedling state locally to prevent repeated creation of new seedlings
+  // Track actual active seedling state locally and in ref to prevent repeated creation of new seedlings
   const [localActiveId, setLocalActiveId] = useState<string | null>(activeSeedlingId);
+  const activeSeedlingIdRef = useRef<string | null>(activeSeedlingId);
 
   useEffect(() => {
     setLocalActiveId(activeSeedlingId);
+    activeSeedlingIdRef.current = activeSeedlingId;
   }, [activeSeedlingId]);
 
   useEffect(() => {
@@ -73,7 +75,6 @@ export const EditorView: React.FC<EditorViewProps> = ({ activeSeedlingId, onBack
 
   // Custom Delete Confirm Modal State
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-  const [confirmTitleInput, setConfirmTitleInput] = useState('');
 
   // Prevent body scrolling when delete modal is open
   useEffect(() => {
@@ -91,6 +92,7 @@ export const EditorView: React.FC<EditorViewProps> = ({ activeSeedlingId, onBack
   useEffect(() => {
     if (lastLoadedIdRef.current !== activeSeedlingId) {
       lastLoadedIdRef.current = activeSeedlingId;
+      activeSeedlingIdRef.current = activeSeedlingId;
       
       if (activeSeedlingId) {
         const activeSeed = seedlings.find(s => s.id === activeSeedlingId);
@@ -128,7 +130,7 @@ export const EditorView: React.FC<EditorViewProps> = ({ activeSeedlingId, onBack
         titleInputRef.current?.focus();
       }, 100);
     }
-  }, [activeSeedlingId, seedlings]);
+  }, [activeSeedlingId]);
 
   const scrollToCursor = () => {
     const selection = window.getSelection();
@@ -780,7 +782,7 @@ export const EditorView: React.FC<EditorViewProps> = ({ activeSeedlingId, onBack
         .map(t => t.trim().toLowerCase())
         .filter(t => t.length > 0);
 
-      const currentId = activeSeedlingId || localActiveId;
+      const currentId = activeSeedlingIdRef.current || activeSeedlingId || localActiveId;
 
       if (currentId) {
         await updateSeedling(currentId, {
@@ -803,8 +805,9 @@ export const EditorView: React.FC<EditorViewProps> = ({ activeSeedlingId, onBack
           isCompleted
         });
         
-        setLocalActiveId(newId);
+        activeSeedlingIdRef.current = newId;
         lastLoadedIdRef.current = newId;
+        setLocalActiveId(newId);
         onSelectSeedling?.(newId);
         setIsDirty(false);
         return newId;
@@ -817,9 +820,9 @@ export const EditorView: React.FC<EditorViewProps> = ({ activeSeedlingId, onBack
     return null;
   };
 
-  const handleGoBack = async () => {
+  const handleGoBack = () => {
     if (isDirty && title.trim()) {
-      await saveNodeData(true);
+      saveNodeData(true).catch(err => console.warn("Background save on back error:", err));
     }
     onBack();
   };
@@ -830,14 +833,14 @@ export const EditorView: React.FC<EditorViewProps> = ({ activeSeedlingId, onBack
 
     const timer = setTimeout(() => {
       saveNodeData(true);
-    }, 2000);
+    }, 1500);
 
     return () => clearTimeout(timer);
   }, [title, content, tagsInput, status, isTask, isCompleted, isDirty]);
 
   const handleDelete = () => {
-    if (activeSeedlingId) {
-      setConfirmTitleInput('');
+    const targetId = activeSeedlingIdRef.current || activeSeedlingId || localActiveId;
+    if (targetId) {
       setIsDeleteModalOpen(true);
     } else {
       onBack();
@@ -845,8 +848,9 @@ export const EditorView: React.FC<EditorViewProps> = ({ activeSeedlingId, onBack
   };
 
   const executeDelete = async () => {
-    if (activeSeedlingId) {
-      await deleteSeedling(activeSeedlingId);
+    const targetId = activeSeedlingIdRef.current || activeSeedlingId || localActiveId;
+    if (targetId) {
+      await deleteSeedling(targetId);
       setIsDeleteModalOpen(false);
       onBack();
     }
@@ -1250,68 +1254,48 @@ export const EditorView: React.FC<EditorViewProps> = ({ activeSeedlingId, onBack
 
       </div>
 
-      {/* Delete Modal */}
-      {isDeleteModalOpen && (() => {
-        const cleanTitleForVerification = title
-          .replace(/[\u1F600-\u1F64F]|[\u2700-\u27BF]|[\uE000-\uF8FF]|\uD83C[\uDC00-\uDFFF]|\uD83D[\uDC00-\uDFFF]|[\u2011-\u26FF]|\uD83E[\uDD10-\uDDFF]/g, '')
-          .replace(/\p{Emoji_Presentation}|\p{Extended_Pictographic}|\p{Emoji}/gu, '')
-          .replace(/\s+/g, ' ')
-          .trim() || 'delete';
-        
-        const isMatch = confirmTitleInput.trim().toLowerCase() === cleanTitleForVerification.toLowerCase();
-
-        return (
-          <div className="fixed inset-0 bg-slate-950/40 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
-            <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-md p-6 text-left space-y-4 shadow-xl">
-              
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-rose-50 flex items-center justify-center text-rose-600 shrink-0">
-                  <Trash2 className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="font-bold text-base text-slate-900">Delete Note</h3>
-                  <p className="text-slate-500 text-xs">This action cannot be undone.</p>
-                </div>
+      {/* Redesigned Easy-to-use Delete Modal */}
+      {isDeleteModalOpen && (
+        <div className="fixed inset-0 bg-slate-950/40 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
+          <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-sm p-6 text-left space-y-4 shadow-xl">
+            
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-rose-50 border border-rose-100 flex items-center justify-center text-rose-600 shrink-0">
+                <Trash2 className="w-5 h-5" />
               </div>
-
-              <p className="text-slate-600 text-xs leading-relaxed">
-                To confirm deletion of <strong className="text-slate-900">"{title}"</strong>, type "<span className="text-rose-600 font-mono font-bold">{cleanTitleForVerification}</span>" below:
-              </p>
-
-              <input
-                type="text"
-                value={confirmTitleInput}
-                onChange={(e) => setConfirmTitleInput(e.target.value)}
-                placeholder="Type note title..."
-                className="w-full px-3 py-2 border border-slate-200 rounded-xl text-xs font-mono focus:outline-none focus:border-rose-500 text-slate-800"
-              />
-
-              <div className="flex items-center justify-end gap-2 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setIsDeleteModalOpen(false)}
-                  className="px-4 py-2 hover:bg-slate-100 text-slate-600 rounded-xl text-xs font-semibold transition-colors cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={executeDelete}
-                  disabled={!isMatch}
-                  className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                    isMatch
-                      ? 'bg-rose-600 hover:bg-rose-700 text-white shadow-xs'
-                      : 'bg-slate-100 text-slate-400 cursor-not-allowed'
-                  }`}
-                >
-                  Delete
-                </button>
+              <div>
+                <h3 className="font-bold text-base text-slate-900">Delete Note?</h3>
+                <p className="text-slate-500 text-xs">This action cannot be undone.</p>
               </div>
-
             </div>
+
+            <div className="p-3 bg-slate-50 border border-slate-100 rounded-xl">
+              <p className="text-slate-700 font-semibold text-xs truncate">
+                "{title.trim() || 'Untitled Note'}"
+              </p>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setIsDeleteModalOpen(false)}
+                className="px-4 py-2 hover:bg-slate-100 text-slate-600 rounded-xl text-xs font-semibold transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={executeDelete}
+                className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer flex items-center gap-1.5"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Delete Note</span>
+              </button>
+            </div>
+
           </div>
-        );
-      })()}
+        </div>
+      )}
 
     </div>
   );

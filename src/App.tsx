@@ -12,7 +12,6 @@ import { SettingsView, AvatarSvg } from './components/SettingsView';
 import { AdminConsoleView } from './components/AdminConsoleView';
 import { LegalView } from './components/LegalView';
 import { FloatingXpAlerts } from './components/FloatingXpAlerts';
-import { EvolutionModal } from './components/EvolutionModal';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Sprout, 
@@ -549,9 +548,6 @@ function GardenAppContent() {
 
       {/* Floating XP Rewards Popups alert stream */}
       <FloatingXpAlerts />
-
-      {/* Full Screen Companion Growth Evolution Ceremony */}
-      <EvolutionModal />
 
       {/* Name Input Modal for New Users */}
       <AnimatePresence>
