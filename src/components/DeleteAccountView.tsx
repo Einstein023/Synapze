@@ -498,15 +498,6 @@ export const DeleteAccountView: React.FC<DeleteAccountViewProps> = ({
                     <div className="bg-slate-50 p-4 sm:p-5 rounded-2xl border border-slate-200 text-left space-y-3.5" id="warning-verification-box">
                       <div className="flex items-center justify-between text-xs font-semibold" id="warning-verification-labels">
                         <label className="text-slate-700 font-bold" id="warning-pwd-label">Confirm Master Password</label>
-                        <button
-                          type="button"
-                          onClick={handleRequestOtp}
-                          disabled={otpLoading}
-                          className="text-rose-600 hover:text-rose-700 font-bold hover:underline transition-all cursor-pointer text-xs"
-                          id="warning-otp-btn"
-                        >
-                          {otpLoading ? "Sending OTP..." : "Forgot password?"}
-                        </button>
                       </div>
                       
                       <div className="relative flex items-center" id="warning-pwd-input-wrapper">

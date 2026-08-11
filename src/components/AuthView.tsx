@@ -11,7 +11,10 @@ import {
   Plus, 
   X,
   Sparkles,
-  ArrowRight
+  ArrowRight,
+  Bot,
+  Database,
+  ShieldCheck
 } from 'lucide-react';
 
 export const AuthView: React.FC<{ 
@@ -61,12 +64,10 @@ export const AuthView: React.FC<{
     setOtpLoading(true);
 
     try {
-      await new Promise(resolve => setTimeout(resolve, 600));
+      await new Promise(resolve => setTimeout(resolve, 500));
       const res = await sendRecoveryOtp(recoveryEmail);
       if (res.success) {
         setOtpSuccessMsg(res.message);
-        setAuthMode('verify_otp');
-        setOtpCode('');
       } else {
         setError(res.message);
       }
@@ -540,24 +541,36 @@ export const AuthView: React.FC<{
               {authMode === 'forgot_password' && (
                 <form onSubmit={handleSendOtp} className="space-y-5 text-left bg-white p-5 border border-slate-200/60 rounded-2xl shadow-xs">
                   <div className="space-y-1">
-                    <h3 className="font-serif text-base font-bold text-[#203d36]">Master Key Recovery</h3>
+                    <h3 className="font-serif text-base font-bold text-[#203d36]">Reset Master Password</h3>
                     <p className="text-xs text-[#5c6e66] leading-relaxed">
-                      Enter your gardener email below. We will send a secure 6-digit recovery OTP code valid for exactly 10 minutes.
+                      Enter your registered email address below. We will send you an official Firebase password reset link to create a new password securely.
                     </p>
                   </div>
 
-                  <div className="space-y-1.5">
-                    <label className="text-[11px] font-medium text-[#5c6e66]">Registered Email address</label>
-                    <input
-                      type="email"
-                      value={recoveryEmail}
-                      onChange={(e) => setRecoveryEmail(e.target.value)}
-                      placeholder="example@synapze.io"
-                      className="w-full py-3 px-4 block border border-slate-205 bg-[#f6f5f0]/40 focus:bg-white text-[#203d36] text-sm focus:outline-none focus:border-[#203d36] rounded-xl transition-all duration-200 placeholder-[#b5bdba] font-medium"
-                      required
-                      disabled={otpLoading}
-                    />
-                  </div>
+                  {otpSuccessMsg ? (
+                    <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl space-y-3 text-left">
+                      <div className="flex items-start gap-2.5 text-emerald-800 text-xs font-medium leading-relaxed">
+                        <Check className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
+                        <span>{otpSuccessMsg}</span>
+                      </div>
+                      <p className="text-[11px] text-emerald-700/80 font-normal">
+                        After resetting your password via the link in your email, return here to sign in with your new password.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-1.5">
+                      <label className="text-[11px] font-medium text-[#5c6e66]">Registered Email Address</label>
+                      <input
+                        type="email"
+                        value={recoveryEmail}
+                        onChange={(e) => setRecoveryEmail(e.target.value)}
+                        placeholder="example@domain.com"
+                        className="w-full py-3 px-4 block border border-slate-200 bg-[#f6f5f0]/40 focus:bg-white text-[#203d36] text-sm focus:outline-none focus:border-[#203d36] rounded-xl transition-all duration-200 placeholder-[#b5bdba] font-medium"
+                        required
+                        disabled={otpLoading}
+                      />
+                    </div>
+                  )}
 
                   <div className="pt-2 flex flex-col sm:flex-row gap-3">
                     <button
@@ -569,140 +582,22 @@ export const AuthView: React.FC<{
                       }}
                       className="w-full sm:w-1/3 py-3 border border-slate-200 text-slate-600 bg-white hover:bg-slate-50 font-semibold text-xs rounded-xl transition-all duration-200 cursor-pointer text-center"
                     >
-                      Go Back
+                      Back to Login
                     </button>
 
-                    <button
-                      type="submit"
-                      disabled={otpLoading}
-                      className="w-full sm:w-2/3 py-3 bg-[#365345] hover:bg-[#203d36] text-[#faf9f6] font-semibold text-xs rounded-xl transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer duration-200"
-                    >
-                      {otpLoading ? (
-                        <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      ) : (
-                        <span>Send Recovery OTP</span>
-                      )}
-                    </button>
-                  </div>
-                </form>
-              )}
-
-              {authMode === 'verify_otp' && (
-                <form onSubmit={handleVerifyOtpOnly} className="space-y-5 text-left bg-white p-5 border border-slate-200/60 rounded-2xl shadow-xs">
-                  <div className="space-y-1">
-                    <h3 className="font-serif text-base font-bold text-[#203d36]">Enter OTP Verification Code</h3>
-                    <p className="text-xs text-[#5c6e66] leading-relaxed">
-                      Enter the 6-digit code sent to <strong className="text-slate-800">{recoveryEmail}</strong>.
-                    </p>
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <label className="text-[11px] font-medium text-[#5c6e66]">6-Digit Recovery OTP</label>
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      pattern="[0-9]*"
-                      maxLength={6}
-                      value={otpCode}
-                      onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ''))}
-                      placeholder="000000"
-                      className="w-full py-3.5 px-4 block border border-slate-300 bg-slate-50 focus:bg-white text-[#203d36] text-xl font-bold font-mono text-center tracking-[0.3em] focus:outline-none focus:border-[#203d36] rounded-xl placeholder-slate-300 min-h-[44px]"
-                      required
-                      disabled={otpLoading}
-                      autoFocus
-                    />
-                  </div>
-
-                  <div className="pt-2 flex flex-col sm:flex-row gap-3">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setError('');
-                        setOtpSuccessMsg('');
-                        setAuthMode('forgot_password');
-                      }}
-                      className="w-full sm:w-1/3 py-3 border border-slate-200 text-slate-600 bg-white hover:bg-slate-50 font-semibold text-xs rounded-xl transition-all duration-200 cursor-pointer text-center min-h-[44px]"
-                    >
-                      Back
-                    </button>
-
-                    <button
-                      type="submit"
-                      disabled={otpLoading || otpCode.length !== 6}
-                      className="w-full sm:w-2/3 py-3 bg-[#365345] hover:bg-[#203d36] disabled:bg-slate-300 text-white font-semibold text-xs rounded-xl transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer duration-200 min-h-[44px]"
-                    >
-                      {otpLoading ? (
-                        <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      ) : (
-                        <span>Confirm OTP</span>
-                      )}
-                    </button>
-                  </div>
-                </form>
-              )}
-
-              {authMode === 'new_password' && (
-                <form onSubmit={handleResetPassword} className="space-y-5 text-left bg-white p-5 border border-slate-200/60 rounded-2xl shadow-xs">
-                  <div className="space-y-1">
-                    <h3 className="font-serif text-base font-bold text-[#203d36]">Set New Master Password</h3>
-                    <p className="text-xs text-[#5c6e66] leading-relaxed">
-                      OTP verified! Please create your new secure password.
-                    </p>
-                  </div>
-
-                  <div className="space-y-4">
-                    <div className="space-y-1.5">
-                      <label className="text-[11px] font-medium text-[#5c6e66]">New Password</label>
-                      <input
-                        type="password"
-                        value={newPassword}
-                        onChange={(e) => setNewPassword(e.target.value)}
-                        placeholder="Minimum 6 characters"
-                        className="w-full py-3 px-4 block border border-slate-200 bg-white text-[#203d36] text-base focus:outline-none focus:border-[#203d36] rounded-xl placeholder-slate-400 font-medium min-h-[44px]"
-                        required
+                    {!otpSuccessMsg && (
+                      <button
+                        type="submit"
                         disabled={otpLoading}
-                        autoFocus
-                      />
-                    </div>
-
-                    <div className="space-y-1.5">
-                      <label className="text-[11px] font-medium text-[#5c6e66]">Confirm New Password</label>
-                      <input
-                        type="password"
-                        value={confirmPassword}
-                        onChange={(e) => setConfirmPassword(e.target.value)}
-                        placeholder="Re-enter new password"
-                        className="w-full py-3 px-4 block border border-slate-200 bg-white text-[#203d36] text-base focus:outline-none focus:border-[#203d36] rounded-xl placeholder-slate-400 font-medium min-h-[44px]"
-                        required
-                        disabled={otpLoading}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="pt-2 flex flex-col sm:flex-row gap-3">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setError('');
-                        setOtpSuccessMsg('');
-                        setAuthMode('verify_otp');
-                      }}
-                      className="w-full sm:w-1/3 py-3 border border-slate-200 text-slate-600 bg-white hover:bg-slate-50 font-semibold text-xs rounded-xl transition-all duration-200 cursor-pointer text-center min-h-[44px]"
-                    >
-                      Back to OTP
-                    </button>
-
-                    <button
-                      type="submit"
-                      disabled={otpLoading || !newPassword || !confirmPassword}
-                      className="w-full sm:w-2/3 py-3 bg-[#365345] hover:bg-[#203d36] disabled:bg-slate-300 text-white font-semibold text-xs rounded-xl transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer duration-200 min-h-[44px]"
-                    >
-                      {otpLoading ? (
-                        <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      ) : (
-                        <span>Save Password & Sign In</span>
-                      )}
-                    </button>
+                        className="w-full sm:w-2/3 py-3 bg-[#365345] hover:bg-[#203d36] text-[#faf9f6] font-semibold text-xs rounded-xl transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer duration-200"
+                      >
+                        {otpLoading ? (
+                          <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                        ) : (
+                          <span>Send Reset Link</span>
+                        )}
+                      </button>
+                    )}
                   </div>
                 </form>
               )}
@@ -734,186 +629,65 @@ export const AuthView: React.FC<{
 
       </div>
 
-      {/* RIGHT SIDE: BEAUTIFUL BRAND CORNER INTERACTIVE METRIC GRAPH (5/12 cols) */}
-      <div className="hidden lg:flex lg:col-span-5 bg-[#2d4239] text-white p-6 sm:p-12 lg:p-16 flex-col justify-between relative overflow-hidden lg:min-h-[100vh]">
+      {/* RIGHT SIDE: CLEAN & MINIMAL BRAND PANEL (5/12 cols) */}
+      <div className="hidden lg:flex lg:col-span-5 bg-[#1b332c] text-white p-12 lg:p-16 flex-col justify-between relative overflow-hidden lg:min-h-[100vh]">
         
-        {/* Aesthetic Background Soft Glows inside dark layout */}
-        <div className="absolute top-1/4 right-0 w-[400px] h-[400px] bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute bottom-10 left-10 w-[200px] h-[200px] bg-[#fdda64]/5 rounded-full blur-3xl pointer-events-none" />
+        {/* Soft Background Accent */}
+        <div className="absolute top-1/3 right-0 w-[300px] h-[300px] bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
 
-        {/* Slogan Text Header block */}
-        <div className="space-y-4 max-w-lg relative z-10 pt-10">
-          <h2 className="font-serif text-3xl sm:text-4xl md:text-5xl font-medium tracking-tight h-auto leading-[1.12]">
-            The simplest way to manage your workforce
+        {/* Top Header */}
+        <div className="space-y-6 relative z-10 my-auto max-w-md">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-950/80 border border-emerald-800/60 text-[#fdda64] text-xs font-semibold">
+            <Sprout className="w-4 h-4 text-[#fdda64]" />
+            <span>Digital Garden Workspace</span>
+          </div>
+
+          <h2 className="font-serif text-3xl sm:text-4xl font-medium tracking-tight leading-snug">
+            A calm, personal space for your thoughts & habits.
           </h2>
           
-          <p className="text-[#bfdad0] text-xs sm:text-sm leading-relaxed max-w-md font-sans">
-            Transform complex data into an organic, living knowledge base. Synapze is the fertile ground for your team's collective intelligence.
+          <p className="text-[#a1c4b8] text-sm leading-relaxed font-sans">
+            Synapze lets you capture ideas, cultivate notes, and build daily consistency in a distraction-free environment.
           </p>
+
+          {/* Minimal Feature List */}
+          <div className="pt-4 space-y-4 text-xs sm:text-sm text-[#d4e6e0]">
+            <div className="flex items-start gap-3">
+              <div className="w-7 h-7 rounded-lg bg-white/10 flex items-center justify-center shrink-0 text-[#fdda64] font-bold text-xs">
+                🌱
+              </div>
+              <div>
+                <p className="font-bold text-white">Sow Seeds & Notes</p>
+                <p className="text-xs text-[#89ab9e]">Organize your thoughts into interconnected knowledge nodes.</p>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-3">
+              <div className="w-7 h-7 rounded-lg bg-white/10 flex items-center justify-center shrink-0 text-emerald-400 font-bold text-xs">
+                ⚡
+              </div>
+              <div>
+                <p className="font-bold text-white">Track Daily Routines</p>
+                <p className="text-xs text-[#89ab9e]">Build habits and track streaks over time.</p>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-3">
+              <div className="w-7 h-7 rounded-lg bg-white/10 flex items-center justify-center shrink-0 text-amber-300 font-bold text-xs">
+                🔒
+              </div>
+              <div>
+                <p className="font-bold text-white">Private & Offline-First</p>
+                <p className="text-xs text-[#89ab9e]">Your data syncs securely to the cloud and stays accessible offline.</p>
+              </div>
+            </div>
+          </div>
         </div>
 
-        {/* Live Glass-morphism dashboard simulation */}
-        <div className="relative my-12 z-10 w-full max-w-md mx-auto">
-          
-          {/* Main Simulated Browser Box */}
-          <div className="bg-white/10 border border-white/15 backdrop-blur-md rounded-2xl p-5 shadow-2xl relative space-y-5">
-            
-            {/* Top Bar with dot indicators, avatars, + add team */}
-            <div className="flex items-center justify-between">
-              
-              {/* Fake navigation dots */}
-              <div className="flex items-center gap-1.5">
-                <span className="w-2.5 h-2.5 rounded-full bg-[#ea5c54]" />
-                <span className="w-2.5 h-2.5 rounded-full bg-[#f4be4f]" />
-                <span className="w-2.5 h-2.5 rounded-full bg-[#57c05b]" />
-              </div>
-
-              {/* Avatars pile with count */}
-              <div className="flex items-center gap-1.5">
-                <div className="flex -space-x-2">
-                  <div className="w-6 h-6 rounded-full bg-slate-300 border border-[#2d4239] text-[9px] font-bold flex items-center justify-center text-slate-800">M</div>
-                  <div className="w-6 h-6 rounded-full bg-[#fdda64] border border-[#2d4239] text-[9px] font-bold flex items-center justify-center text-slate-900">A</div>
-                  <div className="w-6 h-6 rounded-full bg-[#8ae3b2] border border-[#2d4239] text-[9px] font-bold flex items-center justify-center text-[#2d4239]">{activeMembersCount}</div>
-                </div>
-
-                <button 
-                  onClick={() => setIsFloatingInviteVisible(prev => !prev)}
-                  className="px-2 py-1 bg-[#e2f1e6] hover:bg-[#cadcd1] text-[#2d4239] text-[9px] font-bold rounded-md flex items-center gap-1 transition-colors"
-                >
-                  <Plus className="w-2.5 h-2.5" />
-                  Add member
-                </button>
-              </div>
-
-            </div>
-
-            {/* Simulated Grid Stats: Productive and Focused hours */}
-            <div className="grid grid-cols-1 sm:grid-cols-12 gap-3.5">
-              
-              {/* Productive hours widget with custom SVG vector chart line */}
-              <div className="sm:col-span-8 bg-white/5 border border-white/5 p-4 rounded-xl flex items-center justify-between">
-                <div className="space-y-1">
-                  <span className="text-[9px] text-[#bfdad0] font-sans block leading-none">Productive Time / Day</span>
-                  <div className="text-xl font-bold font-serif leading-none pt-1">12.4 hr</div>
-                  <span className="text-[8px] text-emerald-400 font-mono tracking-tight font-medium block pt-1">📈 +23% last week</span>
-                </div>
-
-                {/* Beautiful vector curve chart line */}
-                <svg className="w-20 h-10 text-emerald-400 shrink-0" viewBox="0 0 100 40" fill="none">
-                  <path 
-                    d="M5 35 Q 25 -10, 45 25 T 90 5" 
-                    stroke="currentColor" 
-                    strokeWidth="2.5" 
-                    strokeLinecap="round" 
-                    strokeLinejoin="round" 
-                  />
-                  <path 
-                    d="M5 35 Q 25 -10, 45 25 T 90 5 L 90 40 L 5 40 Z" 
-                    fill="url(#sparkGradient)" 
-                    opacity="0.15" 
-                  />
-                  <defs>
-                    <linearGradient id="sparkGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="currentColor" />
-                      <stop offset="100%" stopColor="transparent" />
-                    </linearGradient>
-                  </defs>
-                </svg>
-              </div>
-
-              {/* Focused time widget */}
-              <div className="sm:col-span-4 bg-white/5 border border-white/5 p-4 rounded-xl flex flex-col justify-center">
-                <span className="text-[9px] text-[#bfdad0] font-sans">Focused Time</span>
-                <div className="text-xl font-bold font-serif leading-none pt-1">8.5 hr</div>
-              </div>
-
-            </div>
-
-            {/* Bottom Section Widget utilization info */}
-            <div className="space-y-1.5 pt-1">
-              <span className="text-[9px] font-sans text-slate-350 block uppercase tracking-wider font-semibold">Team's Utilization</span>
-              <div className="flex flex-wrap gap-4 text-[10px] text-slate-205 font-medium">
-                <span className="flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-[#fdda64] block" />
-                  Marketing
-                </span>
-                <span className="flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-[#8ae3b2] block" />
-                  Customer Success
-                </span>
-              </div>
-            </div>
-
-            {/* FLOATING ADD MEMBER MODAL (Overlapping interactive absolute element) */}
-            {isFloatingInviteVisible && (
-              <div className="absolute right-0 bottom-[-16px] xl:right-[-25px] xl:bottom-[-20px] bg-white text-[#2a2a2a] w-64 p-4.5 rounded-xl shadow-2xl border border-slate-200/90 space-y-3 z-20 hover:scale-[1.02] transition-transform duration-300">
-                <div className="flex items-center justify-between">
-                  <span className="font-serif font-bold text-xs text-[#203d36]">Add Member</span>
-                  <button 
-                    onClick={() => setIsFloatingInviteVisible(false)} 
-                    className="text-slate-400 hover:text-slate-600 transition-colors"
-                  >
-                    <X className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-
-                {/* Mini invite simple form */}
-                <form onSubmit={handleAddMember} className="flex gap-1.5">
-                  <div className="relative flex-1">
-                    <input
-                      type="email"
-                      value={inviteEmail}
-                      onChange={(e) => setInviteEmail(e.target.value)}
-                      placeholder="rafiqur@gmail.com"
-                      className="w-full bg-[#faf9f6] border border-slate-200 px-2 py-1.5 text-[10px] text-slate-800 rounded focus:outline-none focus:border-[#203d36]"
-                    />
-                  </div>
-                  <button 
-                    type="submit" 
-                    className="bg-[#203d36] text-[9px] hover:bg-[#162e29] font-bold text-white px-2.5 py-1.5 rounded transition-colors"
-                  >
-                    Send Invite
-                  </button>
-                </form>
-
-                {/* Team lists inside preview widget */}
-                <div className="space-y-2 pt-1 border-t border-slate-100">
-                  <div className="flex items-center justify-between text-[11px]">
-                    <div className="flex items-center gap-2">
-                      <span className="w-6 h-6 rounded-full bg-[#fdda64] text-[9px] font-bold text-[#453712] flex items-center justify-center">LA</span>
-                      <span className="font-bold text-slate-800">Leslie Alexander</span>
-                    </div>
-                    <span className="text-[8px] font-mono text-slate-400 font-bold">OWNER</span>
-                  </div>
-
-                  {/* Dynamic members list */}
-                  {invitedMembers.map((m, idx) => (
-                    <div key={idx} className="flex items-center justify-between text-[11px] animate-fade-in animate-duration-300">
-                      <div className="flex items-center gap-2">
-                        <span className={`w-6 h-6 rounded-full ${m.color} text-[9px] font-bold text-white flex items-center justify-center`}>{m.initial}</span>
-                        <span className="font-medium text-slate-700 truncate max-w-[120px]">{m.email}</span>
-                      </div>
-                      <span className="text-[8px] font-mono text-emerald-600 font-bold">{m.role}</span>
-                    </div>
-                  ))}
-                </div>
-
-              </div>
-            )}
-
-          </div>
-
-        </div>
-
-        {/* Sponsor/Enterprise logos line at bottom of the dark banner */}
-        <div className="relative z-10">
-          <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 text-xs font-serif font-bold text-white/50 pb-2">
-            <span>WeChat</span>
-            <span>Booking.com</span>
-            <span>Google</span>
-            <span>Spotify</span>
-            <span className="normal-case">stripe</span>
-          </div>
+        {/* Minimal Footer */}
+        <div className="relative z-10 pt-6 border-t border-white/10 text-xs text-[#789a8e] flex items-center justify-between font-mono">
+          <span>Synapze Garden v2.4</span>
+          <span>Cloud & Local Sync Active</span>
         </div>
 
       </div>

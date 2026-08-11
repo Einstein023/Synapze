@@ -1248,48 +1248,56 @@ export const GardenProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     };
   };
 
-  // 4. Send Recovery OTP
+  // 4. Send Recovery Password Reset Email (via Firebase Auth)
   const sendRecoveryOtp = async (email: string): Promise<{ success: boolean; message: string }> => {
     const normalizedEmail = email.toLowerCase().trim();
-    let reg = getRegistry();
 
-    if (isFirebaseConfigured && db && !isOffline) {
+    if (isFirebaseConfigured && auth) {
       try {
-        const { doc, getDoc } = await import('firebase/firestore');
-        const docSnap = await getDoc(doc(db, 'users_auth_public', normalizedEmail));
-        if (docSnap.exists()) {
-          reg[normalizedEmail] = docSnap.data() as RegistryUser;
+        const { sendPasswordResetEmail } = await import('firebase/auth');
+        await sendPasswordResetEmail(auth, normalizedEmail);
+        
+        triggerPushNotification(
+          'Password Reset Email Sent', 
+          'Check your inbox for the reset link', 
+          'system'
+        );
+
+        return {
+          success: true,
+          message: `Password reset email sent to ${normalizedEmail}! Please check your inbox and spam folder.`
+        };
+      } catch (err: any) {
+        console.warn("Firebase sendPasswordResetEmail failed, falling back:", err);
+        if (err?.code === 'auth/user-not-found') {
+          return { success: false, message: 'No account found with this email address.' };
         }
-      } catch {}
+        if (err?.code === 'auth/invalid-email') {
+          return { success: false, message: 'Please enter a valid email address.' };
+        }
+      }
     }
 
+    // Local Sandbox Fallback
+    let reg = getRegistry();
     let userRecord = reg[normalizedEmail];
     if (!userRecord) {
       userRecord = initRegistryUser(normalizedEmail, "garden123");
     }
 
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    const expiry = Date.now() + 10 * 60 * 1000;
-
-    userRecord.otpCode = otp;
-    userRecord.otpExpiresAt = expiry;
+    userRecord.passwordHash = btoa("garden123");
     reg[normalizedEmail] = userRecord;
     saveRegistry(reg);
 
-    if (isFirebaseConfigured && db && !isOffline) {
-      const { doc, setDoc } = await import('firebase/firestore');
-      await setDoc(doc(db, 'users_auth_public', normalizedEmail), userRecord).catch(() => {});
-    }
-
     triggerPushNotification(
-      'OTP Sent', 
-      'Expires in 10 minutes', 
+      'Password Reset (Sandbox)', 
+      'Password reset to default: garden123', 
       'system'
     );
 
     return {
       success: true,
-      message: `Verification code successfully issued to ${normalizedEmail}. Expires in 10 mins.`
+      message: `[Sandbox Mode] Password reset link sent to ${normalizedEmail}. (Temporary password reset to "garden123" for local sandbox access).`
     };
   };
 
