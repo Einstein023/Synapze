@@ -1,13 +1,13 @@
 import React, { useState } from 'react';
-import { ArrowLeft, Shield, FileText } from 'lucide-react';
+import { ArrowLeft, Shield, FileText, History, CheckCircle2, Sparkles, Zap, ShieldCheck } from 'lucide-react';
 
 interface LegalViewProps {
   onBack: () => void;
-  defaultTab?: 'terms' | 'privacy';
+  defaultTab?: 'terms' | 'privacy' | 'changelog';
 }
 
 export const LegalView: React.FC<LegalViewProps> = ({ onBack, defaultTab = 'terms' }) => {
-  const [activeTab, setActiveTab] = useState<'terms' | 'privacy'>(defaultTab);
+  const [activeTab, setActiveTab] = useState<'terms' | 'privacy' | 'changelog'>(defaultTab);
 
   return (
     <div className="min-h-screen bg-[#faf9f6] text-[#1e293b] font-sans py-6 sm:py-10 px-4 sm:px-6 md:px-12 selection:bg-[#cae9d5] selection:text-[#203d36]">
@@ -24,10 +24,10 @@ export const LegalView: React.FC<LegalViewProps> = ({ onBack, defaultTab = 'term
           </button>
 
           {/* Tab Switcher */}
-          <div className="flex bg-slate-200/60 p-1.5 rounded-2xl border border-slate-300/40 w-full sm:w-auto">
+          <div className="flex bg-slate-200/60 p-1.5 rounded-2xl border border-slate-300/40 w-full sm:w-auto overflow-x-auto">
             <button
               onClick={() => setActiveTab('terms')}
-              className={`flex-1 sm:flex-initial px-5 py-3 text-xs sm:text-sm font-bold rounded-xl transition-all cursor-pointer min-h-[48px] flex items-center justify-center gap-2 ${
+              className={`flex-1 sm:flex-initial px-4 sm:px-5 py-3 text-xs sm:text-sm font-bold rounded-xl transition-all cursor-pointer min-h-[48px] flex items-center justify-center gap-2 whitespace-nowrap ${
                 activeTab === 'terms'
                   ? 'bg-white text-[#203d36] shadow-sm'
                   : 'text-slate-600 hover:text-slate-900'
@@ -38,7 +38,7 @@ export const LegalView: React.FC<LegalViewProps> = ({ onBack, defaultTab = 'term
             </button>
             <button
               onClick={() => setActiveTab('privacy')}
-              className={`flex-1 sm:flex-initial px-5 py-3 text-xs sm:text-sm font-bold rounded-xl transition-all cursor-pointer min-h-[48px] flex items-center justify-center gap-2 ${
+              className={`flex-1 sm:flex-initial px-4 sm:px-5 py-3 text-xs sm:text-sm font-bold rounded-xl transition-all cursor-pointer min-h-[48px] flex items-center justify-center gap-2 whitespace-nowrap ${
                 activeTab === 'privacy'
                   ? 'bg-white text-[#203d36] shadow-sm'
                   : 'text-slate-600 hover:text-slate-900'
@@ -46,6 +46,17 @@ export const LegalView: React.FC<LegalViewProps> = ({ onBack, defaultTab = 'term
             >
               <Shield className="w-4 h-4 shrink-0" />
               <span>Privacy Policy</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('changelog')}
+              className={`flex-1 sm:flex-initial px-4 sm:px-5 py-3 text-xs sm:text-sm font-bold rounded-xl transition-all cursor-pointer min-h-[48px] flex items-center justify-center gap-2 whitespace-nowrap ${
+                activeTab === 'changelog'
+                  ? 'bg-white text-[#203d36] shadow-sm'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <History className="w-4 h-4 shrink-0" />
+              <span>Changelog</span>
             </button>
           </div>
         </div>
@@ -116,7 +127,7 @@ export const LegalView: React.FC<LegalViewProps> = ({ onBack, defaultTab = 'term
                 </p>
               </section>
             </div>
-          ) : (
+          ) : activeTab === 'privacy' ? (
             <div className="space-y-6 sm:space-y-8">
               <div className="border-b border-slate-100 pb-5">
                 <span className="text-[11px] font-mono font-extrabold text-emerald-700 uppercase tracking-widest block mb-1.5">
@@ -177,6 +188,91 @@ export const LegalView: React.FC<LegalViewProps> = ({ onBack, defaultTab = 'term
                   If you have questions regarding this Privacy Policy or your data, contact our security team at <span className="font-semibold text-[#203d36]">privacy@synapze.io</span>.
                 </p>
               </section>
+            </div>
+          ) : (
+            <div className="space-y-6 sm:space-y-8">
+              <div className="border-b border-slate-100 pb-5">
+                <span className="text-[11px] font-mono font-extrabold text-emerald-700 uppercase tracking-widest block mb-1.5">
+                  RELEASE NOTES & UPDATES
+                </span>
+                <h1 className="font-serif text-2xl sm:text-3xl md:text-4xl font-extrabold text-[#203d36] tracking-tight">
+                  Platform Changelog
+                </h1>
+                <p className="text-xs text-slate-400 mt-2 font-mono">
+                  Version 2.4.0 | Released: August 2026
+                </p>
+              </div>
+
+              {/* Version 2.4.0 */}
+              <div className="space-y-3 p-4 sm:p-5 bg-[#f6f5f0]/60 rounded-2xl border border-slate-200/60">
+                <div className="flex items-center justify-between">
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-[#203d36] text-white text-xs font-mono font-bold rounded-full">
+                    <Sparkles className="w-3.5 h-3.5 text-emerald-300" />
+                    v2.4.0 — Latest Release
+                  </span>
+                  <span className="text-xs font-mono text-slate-400">August 2026</span>
+                </div>
+                <h3 className="text-base font-serif font-bold text-[#203d36]">Fast Authentication & Instant Workspace Navigation</h3>
+                <ul className="space-y-2 text-xs sm:text-sm text-slate-600">
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                    <span><strong>Optimized Authentication Performance:</strong> Streamlined email/password authentication flow with non-blocking database queries.</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                    <span><strong>Password Policy Updates:</strong> Standardized 8–20 character password length validation with password confirmation fields.</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                    <span><strong>Legal Document Integration:</strong> Direct navigation from Dashboard footers to Privacy Policy, Terms of Service, and Platform Changelog.</span>
+                  </li>
+                </ul>
+              </div>
+
+              {/* Version 2.3.0 */}
+              <div className="space-y-3 p-4 sm:p-5 bg-white rounded-2xl border border-slate-200/60">
+                <div className="flex items-center justify-between">
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-slate-100 text-slate-700 text-xs font-mono font-bold rounded-full border border-slate-200">
+                    <Zap className="w-3.5 h-3.5 text-amber-500" />
+                    v2.3.0
+                  </span>
+                  <span className="text-xs font-mono text-slate-400">July 2026</span>
+                </div>
+                <h3 className="text-base font-serif font-bold text-[#203d36]">AI Companion & Interactive Knowledge Graph</h3>
+                <ul className="space-y-2 text-xs sm:text-sm text-slate-600">
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                    <span><strong>Garden Companion AI:</strong> Chat with your personalized AI gardener assistant to structure notes and plant creative seeds.</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                    <span><strong>Visual Knowledge Ecosystem:</strong> Interactive force-directed node graph mapping notes, tags, and archived seedlings.</span>
+                  </li>
+                </ul>
+              </div>
+
+              {/* Version 2.2.0 */}
+              <div className="space-y-3 p-4 sm:p-5 bg-white rounded-2xl border border-slate-200/60">
+                <div className="flex items-center justify-between">
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-slate-100 text-slate-700 text-xs font-mono font-bold rounded-full border border-slate-200">
+                    <ShieldCheck className="w-3.5 h-3.5 text-indigo-500" />
+                    v2.2.0
+                  </span>
+                  <span className="text-xs font-mono text-slate-400">June 2026</span>
+                </div>
+                <h3 className="text-base font-serif font-bold text-[#203d36]">Real-Time Offline Synchronization & Vault Archive</h3>
+                <ul className="space-y-2 text-xs sm:text-sm text-slate-600">
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                    <span><strong>Offline Local Persistence:</strong> Full client-side caching with auto-reconnection and seamless background sync.</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                    <span><strong>Vault & Recycle Bin:</strong> Safely archive or restore deleted seedlings with permanent purge capabilities.</span>
+                  </li>
+                </ul>
+              </div>
+
             </div>
           )}
 

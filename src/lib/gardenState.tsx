@@ -472,6 +472,7 @@ export const GardenProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   // Handle local persistence fallback
   const recoveryLocalStorage = (uid: string) => {
     const cachedProfile = localStorage.getItem(`synapze_prof_${uid}`);
+    const savedName = localStorage.getItem(`synapze_user_name_${uid}`);
     const cachedSeedlings = localStorage.getItem(`synapze_seed_${uid}`);
     const cachedActivities = localStorage.getItem(`synapze_act_${uid}`);
     const cachedNotifs = localStorage.getItem(`synapze_notif_${uid}`);
@@ -482,12 +483,19 @@ export const GardenProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         if (!parsed.profilePicture) {
           parsed.profilePicture = getStarterAvatar(uid);
         }
+        if ((!parsed.displayName || parsed.displayName === 'Gardener') && savedName) {
+          parsed.displayName = savedName;
+        }
         setProfile(parsed); 
       } catch { 
-        setProfile(defaultProfileWithAuth(uid)); 
+        const def = defaultProfileWithAuth(uid);
+        if (savedName) def.displayName = savedName;
+        setProfile(def); 
       }
     } else {
-      setProfile(defaultProfileWithAuth(uid));
+      const def = defaultProfileWithAuth(uid);
+      if (savedName) def.displayName = savedName;
+      setProfile(def);
     }
 
     if (cachedSeedlings) {
@@ -537,21 +545,51 @@ export const GardenProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       
       let finalProfile: GardenerProfile;
       const currentEmail = auth?.currentUser?.email || localStorage.getItem('synapze_author_email') || undefined;
+      const localSavedName = localStorage.getItem(`synapze_user_name_${uid}`);
       
+      const localProfCacheStr = localStorage.getItem(`synapze_prof_${uid}`);
+      let localProfCache: GardenerProfile | null = null;
+      if (localProfCacheStr) {
+        try { localProfCache = JSON.parse(localProfCacheStr); } catch {}
+      }
+
       if (profSnap && profSnap.exists && profSnap.exists()) {
         finalProfile = profSnap.data() as GardenerProfile;
         if (!finalProfile.profilePicture) {
           finalProfile.profilePicture = getStarterAvatar(uid);
         }
+        
+        // Preserve user name if Firestore holds default 'Gardener' but user previously set a custom name
+        const effectiveName = (finalProfile.displayName && finalProfile.displayName !== 'Gardener')
+          ? finalProfile.displayName
+          : (localProfCache?.displayName && localProfCache.displayName !== 'Gardener')
+            ? localProfCache.displayName
+            : localSavedName || auth?.currentUser?.displayName;
+
+        if (effectiveName && effectiveName !== 'Gardener') {
+          finalProfile.displayName = effectiveName;
+          localStorage.setItem(`synapze_name_configured_${uid}`, 'true');
+          localStorage.setItem(`synapze_user_name_${uid}`, effectiveName);
+        }
+
         if (currentEmail && (!finalProfile.email || finalProfile.email !== currentEmail)) {
           finalProfile.email = currentEmail;
           setDoc(profRef, finalProfile).catch(() => {});
         }
         setProfile(finalProfile);
       } else {
-        // Initialize default profile in firestore
-        finalProfile = defaultProfile(uid);
-        finalProfile.displayName = 'Gardener';
+        // Initialize profile
+        finalProfile = localProfCache || defaultProfile(uid);
+        const effectiveName = (finalProfile.displayName && finalProfile.displayName !== 'Gardener')
+          ? finalProfile.displayName
+          : localSavedName || auth?.currentUser?.displayName;
+
+        if (effectiveName && effectiveName !== 'Gardener') {
+          finalProfile.displayName = effectiveName;
+          localStorage.setItem(`synapze_name_configured_${uid}`, 'true');
+          localStorage.setItem(`synapze_user_name_${uid}`, effectiveName);
+        }
+
         if (currentEmail) {
           finalProfile.email = currentEmail;
         }
@@ -724,16 +762,17 @@ export const GardenProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   const signUpWithEmail = async (email: string, password: string, name?: string) => {
     const normalizedEmail = email.toLowerCase().trim();
+    const trimmedName = name?.trim();
 
     if (isFirebaseConfigured && auth) {
       try {
         const { createUserWithEmailAndPassword, updateProfile: updateAuthProfile } = await import('firebase/auth');
         const userCred = await createUserWithEmailAndPassword(auth, email, password);
-        if (name && name.trim() && userCred.user) {
-          await updateAuthProfile(userCred.user, { displayName: name.trim() }).catch(() => {});
-        }
-        if (name && name.trim()) {
-          updateProfile({ displayName: name.trim() });
+        if (trimmedName && userCred.user) {
+          await updateAuthProfile(userCred.user, { displayName: trimmedName }).catch(() => {});
+          localStorage.setItem(`synapze_name_configured_${userCred.user.uid}`, 'true');
+          localStorage.setItem(`synapze_user_name_${userCred.user.uid}`, trimmedName);
+          updateProfile({ displayName: trimmedName });
         }
         return;
       } catch (err: any) {
@@ -761,13 +800,16 @@ export const GardenProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     saveRegistry(reg);
     await simulateEmailSignIn(email);
 
-    if (name && name.trim()) {
-      updateProfile({ displayName: name.trim() });
+    if (trimmedName) {
+      const activeUid = currentUserUid || 'garden-guest';
+      localStorage.setItem(`synapze_name_configured_${activeUid}`, 'true');
+      localStorage.setItem(`synapze_user_name_${activeUid}`, trimmedName);
+      updateProfile({ displayName: trimmedName });
     }
 
     triggerPushNotification(
       'Account Created', 
-      `Welcome to Synapze Garden, ${name || normalizedEmail}!`, 
+      `Welcome to Synapze Garden, ${trimmedName || normalizedEmail}!`, 
       'system'
     );
   };
@@ -793,6 +835,11 @@ export const GardenProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       const updated = { ...prev, ...profileUpdates };
       localStorage.setItem(`synapze_prof_${currentUserUid}`, JSON.stringify(updated));
       
+      if (updated.displayName && updated.displayName !== 'Gardener') {
+        localStorage.setItem(`synapze_name_configured_${currentUserUid}`, 'true');
+        localStorage.setItem(`synapze_user_name_${currentUserUid}`, updated.displayName);
+      }
+
       // Background save to firebase if online
       if (isFirebaseConfigured && !isOffline && currentUserUid !== 'garden-guest') {
         const pRef = doc(db, 'users', currentUserUid);

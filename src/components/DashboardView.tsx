@@ -85,6 +85,7 @@ interface DashboardViewProps {
   onNavigateToCapture: () => void;
   onNavigateToVault: () => void;
   onOpenSearch?: (initialQuery?: string) => void;
+  onNavigateToLegal?: (tab: 'terms' | 'privacy' | 'changelog') => void;
 }
 
 export const DashboardView: React.FC<DashboardViewProps> = ({
@@ -92,7 +93,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   onNavigateToCompanion,
   onNavigateToCapture,
   onNavigateToVault,
-  onOpenSearch
+  onOpenSearch,
+  onNavigateToLegal
 }) => {
   const { 
     profile, 
@@ -880,9 +882,21 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       <footer className="pt-6 border-t border-slate-100 text-slate-400 text-xs flex flex-col sm:flex-row items-center justify-between gap-4 font-mono font-medium">
         <span>© 2026 Synapze Labs. Planted with care.</span>
         <div className="flex items-center gap-4">
-          <a href="#privacy" className="hover:text-slate-700 transition-colors cursor-pointer">Privacy</a>
+          <button 
+            type="button"
+            onClick={() => onNavigateToLegal?.('privacy')}
+            className="hover:text-slate-700 transition-colors cursor-pointer underline decoration-dotted"
+          >
+            Privacy
+          </button>
           <span>|</span>
-          <a href="#changelog" className="hover:text-slate-700 transition-colors cursor-pointer">Changelog</a>
+          <button 
+            type="button"
+            onClick={() => onNavigateToLegal?.('changelog')}
+            className="hover:text-slate-700 transition-colors cursor-pointer underline decoration-dotted"
+          >
+            Changelog
+          </button>
         </div>
       </footer>
 

@@ -362,9 +362,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onNavigateToLanding,
   const [showDeleteAccountPage, setShowDeleteAccountPage] = useState(initialShowDelete || false);
 
   useEffect(() => {
-    if (initialShowDelete) {
-      setShowDeleteAccountPage(true);
-    }
+    setShowDeleteAccountPage(!!initialShowDelete);
   }, [initialShowDelete]);
 
   // Interactive UI States
@@ -524,7 +522,13 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onNavigateToLanding,
           companionType,
           streakDays: profile.streakDays || 0
         }}
-        onBack={() => setShowDeleteAccountPage(false)}
+        onBack={() => {
+          if (window.history.length > 1) {
+            window.history.back();
+          } else {
+            setShowDeleteAccountPage(false);
+          }
+        }}
         deleteAccount={deleteAccount}
         isOffline={isOffline}
         firebaseActive={firebaseActive}
@@ -716,29 +720,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onNavigateToLanding,
               />
             </div>
           </div>
-        </div>
-
-        {/* Sync Footer with cache pruning */}
-        <div className="flex flex-col sm:flex-row justify-between items-center bg-slate-50 border border-slate-200/50 p-4 rounded-2xl gap-3 text-left">
-          <div className="space-y-0.5">
-            <span className="text-[10px] font-mono font-bold text-slate-400 block uppercase tracking-wider">WORKSPACE SYNCHRONIZATION</span>
-            <div className="flex items-center gap-2">
-              <span className={`w-2 h-2 rounded-full ${saveStatus === 'saved' ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500 animate-spin'}`} />
-              <span className="text-xs font-medium text-slate-600">
-                {saveStatus === 'saved' && '✓ All changes saved automatically.'}
-                {saveStatus === 'saving' && 'Saving and synchronizing seeds...'}
-                {saveStatus === 'error' && '⚠️ Connection issue. Changes buffered.'}
-              </span>
-            </div>
-          </div>
-
-          <button
-            type="button"
-            onClick={handlePruneCache}
-            className="py-2.5 px-4 bg-white hover:bg-rose-50 border border-slate-200 hover:border-rose-200 text-slate-600 hover:text-rose-600 rounded-xl text-xs font-semibold cursor-pointer transition-colors"
-          >
-            Clear Local Memory Cache
-          </button>
         </div>
 
       </div>

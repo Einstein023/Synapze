@@ -48,12 +48,101 @@ function GardenAppContent() {
 
   // Navigation and views controlling states
   const [viewState, setViewState] = useState<'landing' | 'auth' | 'app' | 'legal'>('landing');
-  const [legalTab, setLegalTab] = useState<'terms' | 'privacy'>('terms');
+  const [previousViewState, setPreviousViewState] = useState<'landing' | 'auth' | 'app'>('landing');
+  const [legalTab, setLegalTab] = useState<'terms' | 'privacy' | 'changelog'>('terms');
+
+  const handleOpenLegal = (tab: 'terms' | 'privacy' | 'changelog') => {
+    setPreviousViewState(viewState === 'legal' ? (isAuthenticated ? 'app' : 'landing') : viewState);
+    setLegalTab(tab);
+    setViewState('legal');
+  };
   const [currentTab, setCurrentTab] = useState<'dashboard' | 'capture' | 'editor' | 'companion' | 'vault' | 'settings' | 'admin'>('dashboard');
   const [editingSeedlingId, setEditingSeedlingId] = useState<string | null>(null);
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
   const [showDeleteAccountInSettings, setShowDeleteAccountInSettings] = useState(false);
   const [showLogoLoader, setShowLogoLoader] = useState(false);
+
+  // Command Palette Toggle State
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [initialSearchQuery, setInitialSearchQuery] = useState('');
+  
+  // Mobile Nav Drawer Toggle State
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  // Browser & Device History Navigation State
+  interface AppNavState {
+    viewState: 'landing' | 'auth' | 'app' | 'legal';
+    currentTab: 'dashboard' | 'capture' | 'editor' | 'companion' | 'vault' | 'settings' | 'admin';
+    editingSeedlingId: string | null;
+    legalTab: 'terms' | 'privacy' | 'changelog';
+    isSearchOpen: boolean;
+    isMobileMenuOpen: boolean;
+    showDeleteAccountInSettings: boolean;
+  }
+
+  const isPopStateRef = React.useRef(false);
+  const lastPushedStateRef = React.useRef<string>('');
+
+  // Synchronize hardware/browser back button (popstate event) with application view state
+  useEffect(() => {
+    const initialState: AppNavState = {
+      viewState,
+      currentTab,
+      editingSeedlingId,
+      legalTab,
+      isSearchOpen,
+      isMobileMenuOpen,
+      showDeleteAccountInSettings
+    };
+    const serialized = JSON.stringify(initialState);
+    lastPushedStateRef.current = serialized;
+    window.history.replaceState(initialState, '');
+
+    const handlePopState = (event: PopStateEvent) => {
+      if (event.state) {
+        isPopStateRef.current = true;
+        const state = event.state as AppNavState;
+        if (state.viewState !== undefined) setViewState(state.viewState);
+        if (state.currentTab !== undefined) setCurrentTab(state.currentTab);
+        if (state.editingSeedlingId !== undefined) setEditingSeedlingId(state.editingSeedlingId);
+        if (state.legalTab !== undefined) setLegalTab(state.legalTab);
+        if (state.isSearchOpen !== undefined) setIsSearchOpen(state.isSearchOpen);
+        if (state.isMobileMenuOpen !== undefined) setIsMobileMenuOpen(state.isMobileMenuOpen);
+        if (state.showDeleteAccountInSettings !== undefined) {
+          setShowDeleteAccountInSettings(state.showDeleteAccountInSettings);
+          setIsDeletingAccount(state.showDeleteAccountInSettings);
+        }
+
+        lastPushedStateRef.current = JSON.stringify(state);
+
+        setTimeout(() => {
+          isPopStateRef.current = false;
+        }, 0);
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  // Whenever navigation or overlay state changes in UI, push to browser history
+  useEffect(() => {
+    const currentState: AppNavState = {
+      viewState,
+      currentTab,
+      editingSeedlingId,
+      legalTab,
+      isSearchOpen,
+      isMobileMenuOpen,
+      showDeleteAccountInSettings
+    };
+    const serialized = JSON.stringify(currentState);
+
+    if (!isPopStateRef.current && serialized !== lastPushedStateRef.current) {
+      lastPushedStateRef.current = serialized;
+      window.history.pushState(currentState, '');
+    }
+  }, [viewState, currentTab, editingSeedlingId, legalTab, isSearchOpen, isMobileMenuOpen, showDeleteAccountInSettings]);
 
   const handleSignOut = async () => {
     try {
@@ -81,23 +170,39 @@ function GardenAppContent() {
   const [tempName, setTempName] = useState('');
 
   useEffect(() => {
-    if (isAuthenticated && profile && (profile.displayName === 'Gardener' || !profile.displayName)) {
-      setShowNameModal(true);
+    if (isAuthenticated && profile) {
+      const isAlreadyConfigured = localStorage.getItem(`synapze_name_configured_${profile.uid}`) === 'true';
+      const hasCustomName = Boolean(profile.displayName && profile.displayName !== 'Gardener' && profile.displayName.trim() !== '');
+
+      if (hasCustomName) {
+        localStorage.setItem(`synapze_name_configured_${profile.uid}`, 'true');
+        localStorage.setItem(`synapze_user_name_${profile.uid}`, profile.displayName);
+        setShowNameModal(false);
+      } else if (isAlreadyConfigured) {
+        setShowNameModal(false);
+      } else {
+        setShowNameModal(true);
+      }
     } else {
       setShowNameModal(false);
     }
-  }, [isAuthenticated, profile?.displayName]);
+  }, [isAuthenticated, profile?.uid, profile?.displayName]);
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      if (viewState === 'landing' || viewState === 'auth') {
+        setViewState('app');
+      }
+    } else {
+      if (viewState === 'app') {
+        setViewState('landing');
+      }
+    }
+  }, [isAuthenticated]);
 
   useEffect(() => {
     setIsDeletingAccount(false);
   }, [currentTab]);
-
-  // Command Palette Toggle State
-  const [isSearchOpen, setIsSearchOpen] = useState(false);
-  const [initialSearchQuery, setInitialSearchQuery] = useState('');
-  
-  // Mobile Nav Drawer Toggle State
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   // Keyboard shortcut listener (ESC triggers search, Shift + S triggers settings)
   useEffect(() => {
@@ -122,7 +227,20 @@ function GardenAppContent() {
       case 'capture':
         return <FastCapture onNavigateToEditor={(id) => handleEditNote(id)} />;
       case 'editor':
-        return <EditorView activeSeedlingId={editingSeedlingId} onSelectSeedling={setEditingSeedlingId} onBack={() => { setEditingSeedlingId(null); setCurrentTab('dashboard'); }} />;
+        return (
+          <EditorView 
+            activeSeedlingId={editingSeedlingId} 
+            onSelectSeedling={setEditingSeedlingId} 
+            onBack={() => {
+              if (window.history.length > 1) {
+                window.history.back();
+              } else {
+                setEditingSeedlingId(null);
+                setCurrentTab('dashboard');
+              }
+            }} 
+          />
+        );
       case 'companion':
         return <CompanionCenter />;
       case 'vault':
@@ -160,6 +278,7 @@ function GardenAppContent() {
               setInitialSearchQuery(query || '');
               setIsSearchOpen(true);
             }}
+            onNavigateToLegal={(tab) => handleOpenLegal(tab)}
           />
         );
     }
@@ -169,7 +288,13 @@ function GardenAppContent() {
   if (viewState === 'legal') {
     return (
       <LegalView 
-        onBack={() => setViewState('landing')} 
+        onBack={() => {
+          if (window.history.length > 1) {
+            window.history.back();
+          } else {
+            setViewState(isAuthenticated ? 'app' : previousViewState || 'landing');
+          }
+        }} 
         defaultTab={legalTab} 
       />
     );
@@ -186,10 +311,7 @@ function GardenAppContent() {
           }
         }} 
         onNavigateToAuth={() => setViewState('auth')}
-        onNavigateToLegal={(tab) => {
-          setLegalTab(tab);
-          setViewState('legal');
-        }}
+        onNavigateToLegal={(tab) => handleOpenLegal(tab)}
       />
     );
   }
@@ -197,12 +319,15 @@ function GardenAppContent() {
   if (viewState === 'auth') {
     return (
       <AuthView 
-        onBack={() => setViewState('landing')} 
+        onBack={() => {
+          if (window.history.length > 1) {
+            window.history.back();
+          } else {
+            setViewState('landing');
+          }
+        }} 
         onGoToWorkspace={() => setViewState('app')}
-        onNavigateToLegal={(tab) => {
-          setLegalTab(tab);
-          setViewState('legal');
-        }}
+        onNavigateToLegal={(tab) => handleOpenLegal(tab)}
       />
     );
   }
@@ -597,6 +722,10 @@ function GardenAppContent() {
                   const trimmed = tempName.trim();
                   if (trimmed.length < 2) return;
                   try {
+                    if (profile?.uid) {
+                      localStorage.setItem(`synapze_name_configured_${profile.uid}`, 'true');
+                      localStorage.setItem(`synapze_user_name_${profile.uid}`, trimmed);
+                    }
                     await updateProfile({ displayName: trimmed });
                     setShowNameModal(false);
                     setShowWelcomeModal(true);
@@ -624,6 +753,21 @@ function GardenAppContent() {
                 >
                   Enter Garden Workspace
                 </button>
+
+                <div className="pt-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (profile?.uid) {
+                        localStorage.setItem(`synapze_name_configured_${profile.uid}`, 'true');
+                      }
+                      setShowNameModal(false);
+                    }}
+                    className="text-xs font-mono font-medium text-slate-400 hover:text-slate-600 transition-colors cursor-pointer underline decoration-dotted"
+                  >
+                    Skip for now (Continue as Gardener)
+                  </button>
+                </div>
               </form>
             </motion.div>
           </motion.div>
