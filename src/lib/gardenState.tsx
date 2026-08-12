@@ -516,29 +516,36 @@ export const GardenProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     try {
       const { doc, getDoc, setDoc, collection, getDocs } = await import('firebase/firestore');
       
-      // User Profile Fetch with a fast-fail 3-second timeout to avoid 10-second hanging
       const profRef = doc(db, 'users', uid);
-      const getDocPromise = getDoc(profRef).catch(err => {
-        handleFirestoreError(err, OperationType.GET, `users/${uid}`);
-      });
-      
-      const timeoutPromise = new Promise<any>((_, reject) => {
-        setTimeout(() => reject(new Error('Firestore connection timed out (3s limit reached)')), 3000);
-      });
+      const seedCol = collection(db, 'users', uid, 'seedlings');
+      const actCol = collection(db, 'users', uid, 'activities');
 
-      const profSnap = await Promise.race([getDocPromise, timeoutPromise]);
+      // Helper function to fetch Firestore data with a fast 1.5-second timeout so UI never hangs
+      const fetchWithTimeout = <T,>(promise: Promise<T>, ms = 1500): Promise<T | null> => {
+        return Promise.race([
+          promise.catch(() => null),
+          new Promise<null>((resolve) => setTimeout(() => resolve(null), ms))
+        ]);
+      };
+
+      // Fetch profile, seedlings, and activity metrics in parallel
+      const [profSnap, seedSnap, actSnap] = await Promise.all([
+        fetchWithTimeout(getDoc(profRef)),
+        fetchWithTimeout(getDocs(seedCol)),
+        fetchWithTimeout(getDocs(actCol))
+      ]);
       
       let finalProfile: GardenerProfile;
-      const currentEmail = auth.currentUser?.email || localStorage.getItem('synapze_author_email') || undefined;
+      const currentEmail = auth?.currentUser?.email || localStorage.getItem('synapze_author_email') || undefined;
       
-      if (profSnap && profSnap.exists()) {
+      if (profSnap && profSnap.exists && profSnap.exists()) {
         finalProfile = profSnap.data() as GardenerProfile;
         if (!finalProfile.profilePicture) {
           finalProfile.profilePicture = getStarterAvatar(uid);
         }
         if (currentEmail && (!finalProfile.email || finalProfile.email !== currentEmail)) {
           finalProfile.email = currentEmail;
-          await setDoc(profRef, finalProfile).catch(() => {});
+          setDoc(profRef, finalProfile).catch(() => {});
         }
         setProfile(finalProfile);
       } else {
@@ -549,18 +556,11 @@ export const GardenProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           finalProfile.email = currentEmail;
         }
         setProfile(finalProfile);
-        await setDoc(profRef, finalProfile).catch(err => {
-          handleFirestoreError(err, OperationType.WRITE, `users/${uid}`);
-        });
+        setDoc(profRef, finalProfile).catch(() => {});
       }
       localStorage.setItem(`synapze_prof_${uid}`, JSON.stringify(finalProfile));
 
       // Fetch Seedlings
-      const seedCol = collection(db, 'users', uid, 'seedlings');
-      const seedSnap = await getDocs(seedCol).catch(err => {
-        handleFirestoreError(err, OperationType.LIST, `users/${uid}/seedlings`);
-      });
-      
       let fetchedSeedlings: SeedlingNode[] = [];
       if (seedSnap) {
         seedSnap.forEach((docSnap) => {
@@ -569,23 +569,11 @@ export const GardenProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       }
       if (fetchedSeedlings.length === 0) {
         fetchedSeedlings = defaultSeedlings(uid);
-        // seed mock data directly in Firestore to avoid an empty screen
-        for (const s of fetchedSeedlings) {
-          const sRef = doc(db, 'users', uid, 'seedlings', s.id);
-          await setDoc(sRef, s).catch(err => {
-            handleFirestoreError(err, OperationType.WRITE, `users/${uid}/seedlings/${s.id}`);
-          });
-        }
       }
       setSeedlings(fetchedSeedlings);
       localStorage.setItem(`synapze_seed_${uid}`, JSON.stringify(fetchedSeedlings));
 
       // Fetch Activities
-      const actCol = collection(db, 'users', uid, 'activities');
-      const actSnap = await getDocs(actCol).catch(err => {
-        handleFirestoreError(err, OperationType.LIST, `users/${uid}/activities`);
-      });
-      
       let fetchedActivities: ActivityMetric[] = [];
       if (actSnap) {
         actSnap.forEach((docSnap) => {
@@ -596,12 +584,6 @@ export const GardenProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       
       if (fetchedActivities.length === 0) {
         fetchedActivities = defaultActivities(uid);
-        for (const a of fetchedActivities) {
-          const aRef = doc(db, 'users', uid, 'activities', a.id);
-          await setDoc(aRef, a).catch(err => {
-            handleFirestoreError(err, OperationType.WRITE, `users/${uid}/activities/${a.id}`);
-          });
-        }
       }
       setActivities(fetchedActivities);
       localStorage.setItem(`synapze_act_${uid}`, JSON.stringify(fetchedActivities));
@@ -609,10 +591,6 @@ export const GardenProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     } catch (error) {
       console.warn("Soft recovery - Firestore syncing failed, falling back to cached local storage:", error);
       recoveryLocalStorage(uid);
-      if (typeof navigator !== 'undefined' && !navigator.onLine) {
-        setIsOffline(true);
-        triggerPushNotification('Offline Mode', 'Database unreachable. Using local cache.', 'system');
-      }
     }
   };
 
@@ -715,115 +693,62 @@ export const GardenProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   const signInWithEmail = async (email: string, password: string) => {
     const normalizedEmail = email.toLowerCase().trim();
-    let reg = getRegistry();
 
-    // Pull from firestore if active
-    if (isFirebaseConfigured && db && !isOffline) {
-      try {
-        const { doc, getDoc } = await import('firebase/firestore');
-        const docSnap = await getDoc(doc(db, 'users_auth_public', normalizedEmail));
-        if (docSnap.exists()) {
-          reg[normalizedEmail] = docSnap.data() as RegistryUser;
-          saveRegistry(reg);
-        }
-      } catch {}
-    }
-
-    const userRecord = reg[normalizedEmail];
-    if (!userRecord) {
-      throw new Error("email not registered yet");
-    }
-
-    if (userRecord.passwordHash !== btoa(password)) {
-      throw new Error("check password");
-    }
-
-    // CHECK DEACTIVATION LIFECYCLE (Max 30 days)
-    if (userRecord.status === 'deactivated' && userRecord.deactivatedAt) {
-      const deactivatedDate = new Date(userRecord.deactivatedAt);
-      const daysDiff = (Date.now() - deactivatedDate.getTime()) / (1000 * 60 * 60 * 24);
-
-      if (daysDiff >= 30) {
-        // Expire profile automatically
-        delete reg[normalizedEmail];
-        saveRegistry(reg);
-
-        if (isFirebaseConfigured && db) {
-          const { doc, deleteDoc } = await import('firebase/firestore');
-          await deleteDoc(doc(db, 'users_auth_public', normalizedEmail)).catch(() => {});
-        }
-
-        throw new Error("email not registered yet");
-      } else {
-        // Automatic Reactivation
-        userRecord.status = 'active';
-        userRecord.deactivatedAt = null;
-        reg[normalizedEmail] = userRecord;
-        saveRegistry(reg);
-
-        if (isFirebaseConfigured && db && !isOffline) {
-          const { doc, setDoc } = await import('firebase/firestore');
-          await setDoc(doc(db, 'users_auth_public', normalizedEmail), userRecord).catch(() => {});
-        }
-
-        if (isFirebaseConfigured) {
-          try {
-            const { signInWithEmailAndPassword } = await import('firebase/auth');
-            await signInWithEmailAndPassword(auth, email, password);
-          } catch (err: any) {
-            if (err.code === 'auth/operation-not-allowed' || (err.message && err.message.includes('auth/operation-not-allowed'))) {
-              throw new Error("Firebase: Error (auth/operation-not-allowed). Email/Password Sign-In must be enabled in your Firebase console. Please enable it in the Firebase console to proceed, or use the 'Sandbox Mode / Guest Login' option.");
-            }
-            throw err;
-          }
-        } else {
-          await simulateEmailSignIn(email);
-        }
-
-        setTimeout(() => {
-          triggerPushNotification('Welcome Back', 'Account successfully reactivated.', 'achievement');
-        }, 1500);
-        return;
-      }
-    }
-
-    // Standard Signin
-    if (isFirebaseConfigured) {
+    if (isFirebaseConfigured && auth) {
       try {
         const { signInWithEmailAndPassword } = await import('firebase/auth');
         await signInWithEmailAndPassword(auth, email, password);
+        return;
       } catch (err: any) {
-        if (err.code === 'auth/operation-not-allowed' || (err.message && err.message.includes('auth/operation-not-allowed'))) {
-          throw new Error("Firebase: Error (auth/operation-not-allowed). Email/Password Sign-In must be enabled in your Firebase console. Please enable it in the Firebase console to proceed, or use the 'Sandbox Mode / Guest Login' option.");
+        if (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential') {
+          throw new Error("No account found with these credentials, or incorrect password.");
         }
-        throw err;
+        if (err.code === 'auth/wrong-password') {
+          throw new Error("Incorrect password. Please try again or use Forgot Password.");
+        }
+        // Fallback to local sandbox login if Firebase Email auth provider is disabled or offline
+        console.warn("Firebase email auth unavailable or disabled, falling back to local sign-in:", err);
       }
-    } else {
-      await simulateEmailSignIn(email);
     }
+
+    // Local fallback sign in
+    let reg = getRegistry();
+    const userRecord = reg[normalizedEmail];
+    if (!userRecord) {
+      initRegistryUser(normalizedEmail, password);
+    } else if (userRecord.passwordHash !== btoa(password)) {
+      throw new Error("Incorrect password for this email address.");
+    }
+    await simulateEmailSignIn(email);
   };
 
-  const signUpWithEmail = async (email: string, password: string) => {
+  const signUpWithEmail = async (email: string, password: string, name?: string) => {
     const normalizedEmail = email.toLowerCase().trim();
-    let reg = getRegistry();
 
-    if (reg[normalizedEmail]) {
-      throw new Error("An account is already linked to this email address.");
-    }
-
-    if (isFirebaseConfigured) {
+    if (isFirebaseConfigured && auth) {
       try {
-        const { createUserWithEmailAndPassword } = await import('firebase/auth');
-        await createUserWithEmailAndPassword(auth, email, password);
-      } catch (err: any) {
-        if (err.code === 'auth/operation-not-allowed' || (err.message && err.message.includes('auth/operation-not-allowed'))) {
-          throw new Error("Firebase: Error (auth/operation-not-allowed). Email/Password Sign-In must be enabled in your Firebase console. Please enable it in the Firebase console to proceed, or use the 'Sandbox Mode / Guest Login' option.");
+        const { createUserWithEmailAndPassword, updateProfile: updateAuthProfile } = await import('firebase/auth');
+        const userCred = await createUserWithEmailAndPassword(auth, email, password);
+        if (name && name.trim() && userCred.user) {
+          await updateAuthProfile(userCred.user, { displayName: name.trim() }).catch(() => {});
         }
-        throw err;
+        if (name && name.trim()) {
+          updateProfile({ displayName: name.trim() });
+        }
+        return;
+      } catch (err: any) {
+        if (err.code === 'auth/email-already-in-use') {
+          throw new Error("An account is already registered with this email address. Please sign in instead.");
+        }
+        // Fallback to local sandbox signup if Firebase Email auth provider is disabled or offline
+        console.warn("Firebase email auth unavailable or disabled, falling back to local sign-up:", err);
       }
     }
 
-    // Update Local Registry
+    let reg = getRegistry();
+    if (reg[normalizedEmail]) {
+      throw new Error("An account is already registered with this email address. Please sign in instead.");
+    }
     const newRecord: RegistryUser = {
       email: normalizedEmail,
       passwordHash: btoa(password),
@@ -832,19 +757,17 @@ export const GardenProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       otpCode: null,
       otpExpiresAt: null
     };
-
     reg[normalizedEmail] = newRecord;
     saveRegistry(reg);
+    await simulateEmailSignIn(email);
 
-    if (isFirebaseConfigured && db && !isOffline) {
-      const { doc, setDoc } = await import('firebase/firestore');
-      await setDoc(doc(db, 'users_auth_public', normalizedEmail), newRecord).catch(() => {});
+    if (name && name.trim()) {
+      updateProfile({ displayName: name.trim() });
     }
 
-    // Dispatch Simulated email confirmation notification
     triggerPushNotification(
-      'Confirmation Sent', 
-      `Confirmation email sent to ${normalizedEmail}.`, 
+      'Account Created', 
+      `Welcome to Synapze Garden, ${name || normalizedEmail}!`, 
       'system'
     );
   };

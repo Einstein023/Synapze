@@ -21,7 +21,8 @@ export const AuthView: React.FC<{
   onBack: () => void; 
   onGoToWorkspace?: () => void;
   onNavigateToLegal?: (tab: 'terms' | 'privacy') => void;
-}> = ({ onBack, onGoToWorkspace, onNavigateToLegal }) => {
+  initialSignUp?: boolean;
+}> = ({ onBack, onGoToWorkspace, onNavigateToLegal, initialSignUp = true }) => {
   const { 
     signInWithGoogle, 
     signInWithEmail, 
@@ -36,9 +37,11 @@ export const AuthView: React.FC<{
   } = useGarden();
 
   // Primary Auth States
+  const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [isSignUp, setIsSignUp] = useState(false);
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [isSignUp, setIsSignUp] = useState(initialSignUp);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -49,7 +52,7 @@ export const AuthView: React.FC<{
   const [recoveryEmail, setRecoveryEmail] = useState('');
   const [otpCode, setOtpCode] = useState('');
   const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
+  const [recoveryConfirmPassword, setRecoveryConfirmPassword] = useState('');
   const [otpLoading, setOtpLoading] = useState(false);
   const [otpSuccessMsg, setOtpSuccessMsg] = useState('');
 
@@ -95,7 +98,7 @@ export const AuthView: React.FC<{
         setOtpSuccessMsg('OTP code confirmed! Now enter your new password.');
         setAuthMode('new_password');
         setNewPassword('');
-        setConfirmPassword('');
+        setRecoveryConfirmPassword('');
       } else {
         setError(res.message);
       }
@@ -108,15 +111,15 @@ export const AuthView: React.FC<{
 
   const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newPassword.trim() || !confirmPassword.trim()) {
+    if (!newPassword.trim() || !recoveryConfirmPassword.trim()) {
       setError('Please fill out both password fields.');
       return;
     }
-    if (newPassword.length < 6) {
-      setError('New password must be at least 6 characters.');
+    if (newPassword.length < 8 || newPassword.length > 20) {
+      setError('New password must be between 8 and 20 characters long.');
       return;
     }
-    if (newPassword !== confirmPassword) {
+    if (newPassword !== recoveryConfirmPassword) {
       setError('Passwords do not match.');
       return;
     }
@@ -150,6 +153,15 @@ export const AuthView: React.FC<{
   const [activeMembersCount, setActiveMembersCount] = useState(4);
   const [isFloatingInviteVisible, setIsFloatingInviteVisible] = useState(true);
 
+  // Auto-redirect to workspace when authenticated
+  useEffect(() => {
+    if (isAuthenticated) {
+      if (onGoToWorkspace) {
+        onGoToWorkspace();
+      }
+    }
+  }, [isAuthenticated, onGoToWorkspace]);
+
   // Error handling timeout
   useEffect(() => {
     if (error) {
@@ -169,12 +181,20 @@ export const AuthView: React.FC<{
 
   const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSignUp && !fullName.trim()) {
+      setError('Please enter your full name.');
+      return;
+    }
     if (!email || !email.includes('@')) {
       setError('Please enter a valid email address.');
       return;
     }
-    if (password.length < 6) {
-      setError('Password must be at least 6 characters long.');
+    if (password.length < 8 || password.length > 20) {
+      setError('Password must be between 8 and 20 characters long.');
+      return;
+    }
+    if (isSignUp && password !== confirmPassword) {
+      setError('Passwords do not match. Please re-enter your password.');
       return;
     }
     // Only require agreeing to terms when SIGNING UP
@@ -188,9 +208,12 @@ export const AuthView: React.FC<{
 
     try {
       if (isSignUp) {
-        await signUpWithEmail(email, password);
+        await signUpWithEmail(email, password, fullName.trim());
       } else {
         await signInWithEmail(email, password);
+      }
+      if (onGoToWorkspace) {
+        onGoToWorkspace();
       }
     } catch (err: any) {
       console.warn(err);
@@ -418,8 +441,26 @@ export const AuthView: React.FC<{
                   </div>
 
                   {/* Credential Form */}
-                  <form onSubmit={handleEmailAuth} className="space-y-5 text-left">
+                  <form onSubmit={handleEmailAuth} className="space-y-4 text-left">
                     
+                    {/* Full Name Field (Sign Up Only) */}
+                    {isSignUp && (
+                      <div className="space-y-1.5">
+                        <label className="text-[11px] font-medium text-[#5c6e66] font-sans block">
+                          Full Name
+                        </label>
+                        <input
+                          type="text"
+                          value={fullName}
+                          onChange={(e) => setFullName(e.target.value)}
+                          placeholder="e.g. Alex Morgan"
+                          className="w-full py-3 px-4 block border border-slate-205 bg-[#f6f5f0]/40 focus:bg-white text-[#203d36] text-sm focus:outline-none focus:border-[#203d36] rounded-xl transition-all duration-200 placeholder-[#b5bdba] font-medium"
+                          required={isSignUp}
+                          disabled={loading}
+                        />
+                      </div>
+                    )}
+
                     {/* Email Field */}
                     <div className="space-y-1.5">
                       <label className="text-[11px] font-medium text-[#5c6e66] font-sans block">Email address</label>
@@ -434,22 +475,26 @@ export const AuthView: React.FC<{
                       />
                     </div>
 
-                    {/* Password Field with reveal toggle & forget link */}
+                    {/* Password Field with reveal toggle & 8-20 char rules */}
                     <div className="space-y-1.5">
                       <div className="flex items-center justify-between">
-                        <label className="text-[11px] font-medium text-[#5c6e66] font-sans">Password</label>
-                        <button 
-                          type="button"
-                          onClick={() => {
-                            setRecoveryEmail(email);
-                            setError('');
-                            setOtpSuccessMsg('');
-                            setAuthMode('forgot_password');
-                          }}
-                          className="text-[11px] text-[#5c6e66] hover:text-[#203d36] font-semibold transition-colors cursor-pointer"
-                        >
-                          Forgot password?
-                        </button>
+                        <label className="text-[11px] font-medium text-[#5c6e66] font-sans">
+                          Password {isSignUp && <span className="text-[10px] text-slate-400 font-normal">(8–20 characters)</span>}
+                        </label>
+                        {!isSignUp && (
+                          <button 
+                            type="button"
+                            onClick={() => {
+                              setRecoveryEmail(email);
+                              setError('');
+                              setOtpSuccessMsg('');
+                              setAuthMode('forgot_password');
+                            }}
+                            className="text-[11px] text-[#5c6e66] hover:text-[#203d36] font-semibold transition-colors cursor-pointer"
+                          >
+                            Forgot password?
+                          </button>
+                        )}
                       </div>
 
                       <div className="relative">
@@ -458,6 +503,8 @@ export const AuthView: React.FC<{
                           value={password}
                           onChange={(e) => setPassword(e.target.value)}
                           placeholder="••••••••"
+                          minLength={8}
+                          maxLength={20}
                           className="w-full py-3 pl-4 pr-11 block border border-slate-205 bg-[#f6f5f0]/40 focus:bg-white text-[#203d36] text-sm focus:outline-none focus:border-[#203d36] rounded-xl transition-all duration-200 placeholder-[#b5bdba] font-medium"
                           required
                           disabled={loading}
@@ -473,6 +520,28 @@ export const AuthView: React.FC<{
                         </button>
                       </div>
                     </div>
+
+                    {/* Confirm Password Field (Sign Up Only) */}
+                    {isSignUp && (
+                      <div className="space-y-1.5">
+                        <label className="text-[11px] font-medium text-[#5c6e66] font-sans block">
+                          Confirm Password
+                        </label>
+                        <div className="relative">
+                          <input
+                            type={showPassword ? "text" : "password"}
+                            value={confirmPassword}
+                            onChange={(e) => setConfirmPassword(e.target.value)}
+                            placeholder="Re-enter password"
+                            minLength={8}
+                            maxLength={20}
+                            className="w-full py-3 pl-4 pr-11 block border border-slate-205 bg-[#f6f5f0]/40 focus:bg-white text-[#203d36] text-sm focus:outline-none focus:border-[#203d36] rounded-xl transition-all duration-200 placeholder-[#b5bdba] font-medium"
+                            required={isSignUp}
+                            disabled={loading}
+                          />
+                        </div>
+                      </div>
+                    )}
 
                     {/* Terms & Privacy Checkbox (ONLY shown when registering / Sign Up) */}
                     {isSignUp && (
@@ -529,7 +598,7 @@ export const AuthView: React.FC<{
                         {loading ? (
                           <span className="w-5 h-5 border-2 border-[#faf9f6] border-t-transparent rounded-full animate-spin" />
                         ) : (
-                          <span>{isSignUp ? 'Register Sprout Profile' : 'Enter Terminal'}</span>
+                          <span>{isSignUp ? 'Create Account' : 'Sign In'}</span>
                         )}
                       </button>
                     </div>
@@ -610,10 +679,13 @@ export const AuthView: React.FC<{
                 
                 <button
                   type="button"
-                  onClick={() => setIsSignUp(prev => !prev)}
-                  className="text-xs font-bold text-[#365345] hover:text-[#203d36] underline cursor-pointer decoration-solid transition-colors"
+                  onClick={() => {
+                    setError('');
+                    setIsSignUp(prev => !prev);
+                  }}
+                  className="text-xs font-bold text-[#365345] hover:text-[#203d36] underline cursor-pointer decoration-solid transition-colors ml-1"
                 >
-                  {isSignUp ? "Sign in to garden" : "Start growing for free"}
+                  {isSignUp ? "Sign In" : "Sign Up"}
                 </button>
               </div>
 
@@ -624,7 +696,7 @@ export const AuthView: React.FC<{
 
         {/* Left Side Small Aesthetic footer */}
         <div className="text-center font-mono text-[10px] text-slate-400 font-medium">
-          © 2261 Synapze Labs. Planted with care.
+          © 2026 Synapze Labs. Planted with care.
         </div>
 
       </div>
