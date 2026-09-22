@@ -1,0 +1,9 @@
+User-agent: *
+Allow: /
+Allow: /privacy
+Allow: /terms
+Allow: /changelog
+Disallow: /admin
+Disallow: /api/
+
+Sitemap: https://synapze.garden/sitemap.xml
