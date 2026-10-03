@@ -3,6 +3,7 @@ import { useGarden } from '../lib/gardenState';
 import { Save, Bell, RefreshCw, User, Settings, Database, Trash2, Sprout, Bot, ShieldCheck, ShieldAlert, Mail, Check, Sparkles, AlertTriangle, X } from 'lucide-react';
 import { DeleteAccountView } from './DeleteAccountView';
 import { getFriendlyErrorMessage } from '../lib/errorUtils';
+import { TestRunnerModal } from './TestRunnerModal';
 
 export const AvatarSvg: React.FC<{ 
   type: string; 
@@ -368,6 +369,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onNavigateToLanding,
   // Interactive UI States
   const [showAvatarPicker, setShowAvatarPicker] = useState(false);
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'error'>('saved');
+  const [showDiagnosticsModal, setShowDiagnosticsModal] = useState(false);
 
   // OTP states for recovery inside deactivate / delete modal
   const [otpSent, setOtpSent] = useState(false);
@@ -724,6 +726,29 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onNavigateToLanding,
 
       </div>
 
+      {/* System Diagnostics & Automated Testing Suite */}
+      <div className="bg-white border border-slate-200/80 rounded-2xl p-6 md:p-8 shadow-xs text-left space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="space-y-1">
+            <h3 className="font-sans font-bold text-slate-900 text-lg flex items-center gap-2">
+              <ShieldCheck className="w-5 h-5 text-emerald-600" />
+              <span>System Diagnostics & Test Suite</span>
+            </h3>
+            <p className="text-slate-500 text-sm">
+              Verify that account signup/signin, Google authentication, notes CRUD, and cross-device sync are working appropriately.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowDiagnosticsModal(true)}
+            className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] text-white text-xs sm:text-sm font-bold rounded-xl shadow-xs transition-all cursor-pointer flex items-center justify-center gap-2 shrink-0"
+          >
+            <ShieldCheck className="w-4 h-4" />
+            <span>Run Test Suite</span>
+          </button>
+        </div>
+      </div>
+
       {/* Danger Zone Section */}
       <div className="bg-white border border-slate-200/80 rounded-2xl p-6 md:p-8 shadow-xs text-left space-y-5">
         <div className="space-y-1">
@@ -813,6 +838,13 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onNavigateToLanding,
             </div>
           </div>
         </div>
+      )}
+
+      {showDiagnosticsModal && (
+        <TestRunnerModal
+          isOpen={showDiagnosticsModal}
+          onClose={() => setShowDiagnosticsModal(false)}
+        />
       )}
 
     </div>

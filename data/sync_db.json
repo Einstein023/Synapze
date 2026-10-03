@@ -6,6 +6,42 @@
       "displayName": "Alex The Master Gardener",
       "createdAt": "2026-10-03T07:09:11.240Z",
       "uid": "usr_Z2FyZGVuZX"
+    },
+    "test_gardener_1791056722348@synapze.io": {
+      "email": "test_gardener_1791056722348@synapze.io",
+      "passwordHash": "UGFzc3dvcmQxMjMh",
+      "displayName": "Test Florist",
+      "createdAt": "2026-10-03T19:45:22.416Z",
+      "uid": "usr_dGVzdF9nYX"
+    },
+    "sync_user_1791056722485@synapze.io": {
+      "email": "sync_user_1791056722485@synapze.io",
+      "passwordHash": "R2FyZGVuUGFzc3dvcmQxMjMh",
+      "displayName": "Sync Botanist",
+      "createdAt": "2026-10-03T19:45:22.488Z",
+      "uid": "usr_c3luY191c2"
+    },
+    "test_gardener_1791056738479@synapze.io": {
+      "email": "test_gardener_1791056738479@synapze.io",
+      "passwordHash": "TmV3U2VjcmV0UGFzc3dvcmQyMDI2IQ==",
+      "displayName": "Test Florist",
+      "createdAt": "2026-10-03T19:45:38.566Z",
+      "uid": "usr_dGVzdF9nYX"
+    },
+    "google_user_1791056738595@gmail.com": {
+      "email": "google_user_1791056738595@gmail.com",
+      "displayName": "Google Arborist",
+      "createdAt": "2026-10-03T19:45:38.598Z",
+      "uid": "usr_Z29vZ2xlX3",
+      "provider": "google",
+      "photoUrl": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80"
+    },
+    "sync_user_1791056738635@synapze.io": {
+      "email": "sync_user_1791056738635@synapze.io",
+      "passwordHash": "R2FyZGVuUGFzc3dvcmQxMjMh",
+      "displayName": "Sync Botanist",
+      "createdAt": "2026-10-03T19:45:38.637Z",
+      "uid": "usr_c3luY191c2"
     }
   },
   "profiles": {
@@ -23,6 +59,78 @@
       "pushNotifications": true,
       "profilePicture": "avatar_sprout",
       "updatedAt": "2026-10-03T07:09:11.273Z"
+    },
+    "test_gardener_1791056722348@synapze.io": {
+      "uid": "usr_dGVzdF9nYX",
+      "email": "test_gardener_1791056722348@synapze.io",
+      "displayName": "Test Florist",
+      "bio": "Sowing the seeds of intentional knowledge curation.",
+      "companionName": "SPROUTY",
+      "companionType": "Sproutling",
+      "companionXp": 120,
+      "streakDays": 0,
+      "lastActiveDate": "2026-10-03",
+      "theme": "alabaster",
+      "pushNotifications": true,
+      "profilePicture": "avatar_sprout"
+    },
+    "sync_user_1791056722485@synapze.io": {
+      "uid": "usr_c3luY191c2",
+      "email": "sync_user_1791056722485@synapze.io",
+      "displayName": "Sync Botanist",
+      "bio": "Cultivating digital thoughts across mobile and desktop devices.",
+      "companionName": "SPROUTY",
+      "companionType": "Bloomkin",
+      "companionXp": 120,
+      "streakDays": 5,
+      "lastActiveDate": "2026-10-03",
+      "theme": "sage",
+      "pushNotifications": true,
+      "profilePicture": "avatar_sprout",
+      "updatedAt": "2026-10-03T19:45:22.494Z"
+    },
+    "test_gardener_1791056738479@synapze.io": {
+      "uid": "usr_dGVzdF9nYX",
+      "email": "test_gardener_1791056738479@synapze.io",
+      "displayName": "Test Florist",
+      "bio": "Sowing the seeds of intentional knowledge curation.",
+      "companionName": "SPROUTY",
+      "companionType": "Sproutling",
+      "companionXp": 120,
+      "streakDays": 0,
+      "lastActiveDate": "2026-10-03",
+      "theme": "alabaster",
+      "pushNotifications": true,
+      "profilePicture": "avatar_sprout"
+    },
+    "google_user_1791056738595@gmail.com": {
+      "uid": "usr_Z29vZ2xlX3",
+      "email": "google_user_1791056738595@gmail.com",
+      "displayName": "Google Arborist",
+      "bio": "Sowing the seeds of intentional knowledge curation.",
+      "companionName": "SPROUTY",
+      "companionType": "Sproutling",
+      "companionXp": 120,
+      "streakDays": 0,
+      "lastActiveDate": "2026-10-03",
+      "theme": "alabaster",
+      "pushNotifications": true,
+      "profilePicture": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80"
+    },
+    "sync_user_1791056738635@synapze.io": {
+      "uid": "usr_c3luY191c2",
+      "email": "sync_user_1791056738635@synapze.io",
+      "displayName": "Sync Botanist",
+      "bio": "Cultivating digital thoughts across mobile and desktop devices.",
+      "companionName": "SPROUTY",
+      "companionType": "Bloomkin",
+      "companionXp": 120,
+      "streakDays": 5,
+      "lastActiveDate": "2026-10-03",
+      "theme": "sage",
+      "pushNotifications": true,
+      "profilePicture": "avatar_sprout",
+      "updatedAt": "2026-10-03T19:45:38.641Z"
     }
   },
   "seedlings": {
@@ -56,7 +164,77 @@
         "createdAt": "2026-10-03T07:09:11.250Z",
         "updatedAt": "2026-10-03T07:09:11.250Z"
       }
-    ]
+    ],
+    "uhunomaof@gmail.com": [
+      {
+        "id": "seed_etg28sphr",
+        "title": "hhh",
+        "content": "ogugu",
+        "tags": [],
+        "status": "active",
+        "isTask": false,
+        "isCompleted": false,
+        "userId": "Yv2tL02f9kOHtn8D4m2vYdYObVo1",
+        "createdAt": "2026-10-03T06:41:31.735Z",
+        "updatedAt": "2026-10-03T06:41:49.900Z"
+      },
+      {
+        "id": "seed_iecnal06s",
+        "title": "hello",
+        "content": "make&nbsp;",
+        "tags": [],
+        "status": "active",
+        "isTask": false,
+        "isCompleted": false,
+        "userId": "Yv2tL02f9kOHtn8D4m2vYdYObVo1",
+        "createdAt": "2026-10-03T06:31:28.912Z",
+        "updatedAt": "2026-10-03T06:31:33.062Z"
+      },
+      {
+        "id": "seed_n3rznspao",
+        "title": "giyb",
+        "content": "<br>",
+        "tags": [],
+        "status": "active",
+        "isTask": false,
+        "isCompleted": false,
+        "userId": "Yv2tL02f9kOHtn8D4m2vYdYObVo1",
+        "createdAt": "2026-08-10T16:49:28.117Z",
+        "updatedAt": "2026-08-10T16:49:37.252Z"
+      },
+      {
+        "id": "seed_a5myj34dv",
+        "title": "uiqiwbdiyw",
+        "content": "<p>qiqidgiqgihdiqdqdqidyqdiqydiqidhwdqgidqg dwiywdfiuw</p>",
+        "tags": [],
+        "status": "active",
+        "isTask": false,
+        "isCompleted": false,
+        "userId": "Yv2tL02f9kOHtn8D4m2vYdYObVo1",
+        "createdAt": "2026-08-10T16:48:39.905Z",
+        "updatedAt": "2026-08-10T16:48:48.975Z"
+      }
+    ],
+    "sync_user_1791056722485@synapze.io": [
+      {
+        "id": "node_1791056722496",
+        "userId": "usr_c3luY191c2",
+        "title": "Dendrochronology Notes (Expanded)",
+        "content": "Analyzing tree rings: Updated with core samples from ancient Bristlecone pines.",
+        "status": "growing",
+        "isTask": false,
+        "isCompleted": false,
+        "tags": [
+          "botany",
+          "climate",
+          "research"
+        ],
+        "createdAt": "2026-10-03T19:45:22.496Z",
+        "updatedAt": "2026-10-03T19:45:22.502Z"
+      }
+    ],
+    "sync_user_1791056738635@synapze.io": []
   },
-  "activities": {}
+  "activities": {},
+  "otps": {}
 }

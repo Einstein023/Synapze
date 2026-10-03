@@ -25,6 +25,17 @@ export function getFriendlyErrorMessage(err: any): string {
     return 'You are currently offline';
   }
 
+  // Google OAuth / Popup specifics
+  if (message === 'NEED_GOOGLE_EMAIL') {
+    return 'Please enter your Google email to connect your account.';
+  }
+  if (msgLower.includes('popup-blocked') || msgLower.includes('cancelled-popup') || msgLower.includes('popup-closed')) {
+    return 'Google popup was blocked or closed. Please enter your Google email directly.';
+  }
+  if (msgLower.includes('unauthorized-domain')) {
+    return 'Preview domain requires direct Google email sign-in. Enter your Google email below.';
+  }
+
   // Network / Connection Issues
   if (
     msgLower.includes('network') || 
