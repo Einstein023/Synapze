@@ -42,6 +42,28 @@
       "displayName": "Sync Botanist",
       "createdAt": "2026-10-03T19:45:38.637Z",
       "uid": "usr_c3luY191c2"
+    },
+    "test_gardener_1791057250344@synapze.io": {
+      "email": "test_gardener_1791057250344@synapze.io",
+      "passwordHash": "TmV3U2VjcmV0UGFzc3dvcmQyMDI2IQ==",
+      "displayName": "Test Florist",
+      "createdAt": "2026-10-03T19:54:10.431Z",
+      "uid": "usr_dGVzdF9nYX"
+    },
+    "google_user_1791057250463@gmail.com": {
+      "email": "google_user_1791057250463@gmail.com",
+      "displayName": "Google Arborist",
+      "createdAt": "2026-10-03T19:54:10.467Z",
+      "uid": "usr_Z29vZ2xlX3",
+      "provider": "google",
+      "photoUrl": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80"
+    },
+    "sync_user_1791057250507@synapze.io": {
+      "email": "sync_user_1791057250507@synapze.io",
+      "passwordHash": "R2FyZGVuUGFzc3dvcmQxMjMh",
+      "displayName": "Sync Botanist",
+      "createdAt": "2026-10-03T19:54:10.510Z",
+      "uid": "usr_c3luY191c2"
     }
   },
   "profiles": {
@@ -131,6 +153,49 @@
       "pushNotifications": true,
       "profilePicture": "avatar_sprout",
       "updatedAt": "2026-10-03T19:45:38.641Z"
+    },
+    "test_gardener_1791057250344@synapze.io": {
+      "uid": "usr_dGVzdF9nYX",
+      "email": "test_gardener_1791057250344@synapze.io",
+      "displayName": "Test Florist",
+      "bio": "Sowing the seeds of intentional knowledge curation.",
+      "companionName": "SPROUTY",
+      "companionType": "Sproutling",
+      "companionXp": 120,
+      "streakDays": 0,
+      "lastActiveDate": "2026-10-03",
+      "theme": "alabaster",
+      "pushNotifications": true,
+      "profilePicture": "avatar_sprout"
+    },
+    "google_user_1791057250463@gmail.com": {
+      "uid": "usr_Z29vZ2xlX3",
+      "email": "google_user_1791057250463@gmail.com",
+      "displayName": "Google Arborist",
+      "bio": "Sowing the seeds of intentional knowledge curation.",
+      "companionName": "SPROUTY",
+      "companionType": "Sproutling",
+      "companionXp": 120,
+      "streakDays": 0,
+      "lastActiveDate": "2026-10-03",
+      "theme": "alabaster",
+      "pushNotifications": true,
+      "profilePicture": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80"
+    },
+    "sync_user_1791057250507@synapze.io": {
+      "uid": "usr_c3luY191c2",
+      "email": "sync_user_1791057250507@synapze.io",
+      "displayName": "Sync Botanist",
+      "bio": "Cultivating digital thoughts across mobile and desktop devices.",
+      "companionName": "SPROUTY",
+      "companionType": "Bloomkin",
+      "companionXp": 120,
+      "streakDays": 5,
+      "lastActiveDate": "2026-10-03",
+      "theme": "sage",
+      "pushNotifications": true,
+      "profilePicture": "avatar_sprout",
+      "updatedAt": "2026-10-03T19:54:10.514Z"
     }
   },
   "seedlings": {
@@ -233,7 +298,8 @@
         "updatedAt": "2026-10-03T19:45:22.502Z"
       }
     ],
-    "sync_user_1791056738635@synapze.io": []
+    "sync_user_1791056738635@synapze.io": [],
+    "sync_user_1791057250507@synapze.io": []
   },
   "activities": {},
   "otps": {}
