@@ -46,10 +46,79 @@ async function startServer() {
   // JSON parsing middleware for post payloads with high limit for image uploads
   app.use(express.json({ limit: '25mb' }));
 
-  // Ensure uploads directory exists
+  // Ensure uploads and data directories exist
   const uploadsDir = path.join(process.cwd(), 'uploads');
   if (!fs.existsSync(uploadsDir)) {
     fs.mkdirSync(uploadsDir, { recursive: true });
+  }
+
+  const dataDir = path.join(process.cwd(), 'data');
+  if (!fs.existsSync(dataDir)) {
+    fs.mkdirSync(dataDir, { recursive: true });
+  }
+
+  // Persistent Cross-Device Sync Store for Multi-Device Notes & Profiles
+  const syncDbFile = path.join(dataDir, 'sync_db.json');
+  interface SyncUser {
+    email: string;
+    passwordHash: string;
+    displayName?: string;
+    createdAt: string;
+    uid: string;
+  }
+  interface SyncStore {
+    users: Record<string, SyncUser>;
+    profiles: Record<string, any>;
+    seedlings: Record<string, any[]>;
+    activities: Record<string, any[]>;
+  }
+
+  function loadSyncDb(): SyncStore {
+    try {
+      if (fs.existsSync(syncDbFile)) {
+        const raw = fs.readFileSync(syncDbFile, 'utf8');
+        return JSON.parse(raw);
+      }
+    } catch (e) {
+      console.warn('[SYNC STORE] Error loading sync_db.json, resetting:', e);
+    }
+    return { users: {}, profiles: {}, seedlings: {}, activities: {} };
+  }
+
+  function saveSyncDb(store: SyncStore) {
+    try {
+      fs.writeFileSync(syncDbFile, JSON.stringify(store, null, 2), 'utf8');
+    } catch (e) {
+      console.error('[SYNC STORE] Error saving sync_db.json:', e);
+    }
+  }
+
+  function getAccountKey(email?: string, userId?: string): string {
+    if (email && email.trim()) {
+      return email.toLowerCase().trim();
+    }
+    if (userId && userId.trim() && userId !== 'garden-guest') {
+      return userId.trim();
+    }
+    return 'garden-guest';
+  }
+
+  // Active SSE connections for real-time multi-device synchronization
+  const sseClients = new Map<string, Set<express.Response>>();
+
+  function broadcastSyncEvent(accountKey: string, event: { type: string; [key: string]: any }, excludeRes?: express.Response) {
+    const clients = sseClients.get(accountKey);
+    if (!clients || clients.size === 0) return;
+    const payload = `data: ${JSON.stringify(event)}\n\n`;
+    for (const client of Array.from(clients)) {
+      if (client !== excludeRes) {
+        try {
+          client.write(payload);
+        } catch {
+          clients.delete(client);
+        }
+      }
+    }
   }
 
   // Serve uploaded files statically
@@ -444,6 +513,345 @@ Keep the tone poetic, inspiring, and horticultural. Do NOT write any HTML or sub
     } catch (err) {
       console.error("Weekly Garden Growth Report generation error:", err);
       res.status(500).json({ error: "Failed to generate weekly growth report." });
+    }
+  });
+
+  // --- CROSS-DEVICE REAL-TIME SYNCHRONIZATION API ---
+
+  // 1. Server-Sent Events (SSE) stream for instantaneous cross-device push
+  app.get('/api/sync/events', (req, res) => {
+    const { email, userId } = req.query;
+    const accountKey = getAccountKey(email as string, userId as string);
+
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache, no-transform');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no');
+    res.flushHeaders?.();
+
+    if (!sseClients.has(accountKey)) {
+      sseClients.set(accountKey, new Set());
+    }
+    const clientSet = sseClients.get(accountKey)!;
+    clientSet.add(res);
+
+    // Initial greeting / connection established
+    res.write(`data: ${JSON.stringify({ type: 'CONNECTED', accountKey })}\n\n`);
+
+    // Periodic heartbeat to prevent mobile browsers / proxies from dropping SSE
+    const heartbeat = setInterval(() => {
+      try {
+        res.write(': keepalive\n\n');
+      } catch {
+        clearInterval(heartbeat);
+      }
+    }, 20000);
+
+    req.on('close', () => {
+      clearInterval(heartbeat);
+      clientSet.delete(res);
+      if (clientSet.size === 0) {
+        sseClients.delete(accountKey);
+      }
+    });
+  });
+
+  // 2. Fetch all synchronized data for an account
+  app.get('/api/sync', (req, res) => {
+    try {
+      const { email, userId } = req.query;
+      const accountKey = getAccountKey(email as string, userId as string);
+      const store = loadSyncDb();
+
+      const profile = store.profiles[accountKey] || null;
+      const seedlings = store.seedlings[accountKey] || [];
+      const activities = store.activities[accountKey] || [];
+
+      res.json({
+        success: true,
+        accountKey,
+        profile,
+        seedlings,
+        activities
+      });
+    } catch (err: any) {
+      console.error('[SYNC API] Get error:', err);
+      res.status(500).json({ error: 'Failed to retrieve synchronized data.' });
+    }
+  });
+
+  // 3. Update Profile & broadcast to other devices
+  app.post('/api/sync/profile', (req, res) => {
+    try {
+      const { email, userId, profile } = req.body;
+      if (!profile) {
+        return res.status(400).json({ error: 'Missing profile data.' });
+      }
+
+      const accountKey = getAccountKey(email, userId);
+      const store = loadSyncDb();
+
+      // Deep merge existing profile with new updates
+      const existing = store.profiles[accountKey] || {};
+      const updatedProfile = { ...existing, ...profile, updatedAt: new Date().toISOString() };
+      store.profiles[accountKey] = updatedProfile;
+
+      // Also update displayName in users table if applicable
+      if (updatedProfile.displayName && store.users[accountKey]) {
+        store.users[accountKey].displayName = updatedProfile.displayName;
+      }
+
+      saveSyncDb(store);
+
+      // Broadcast to other devices (e.g. phone or laptop)
+      broadcastSyncEvent(accountKey, {
+        type: 'PROFILE_UPDATED',
+        profile: updatedProfile,
+        source: 'sync'
+      }, res);
+
+      res.json({ success: true, profile: updatedProfile });
+    } catch (err: any) {
+      console.error('[SYNC API] Profile sync error:', err);
+      res.status(500).json({ error: 'Failed to update profile sync.' });
+    }
+  });
+
+  // 4. Batch sync seedlings with 2-way merge & timestamp conflict resolution
+  app.post('/api/sync/seedlings', (req, res) => {
+    try {
+      const { email, userId, seedlings } = req.body;
+      if (!Array.isArray(seedlings)) {
+        return res.status(400).json({ error: 'Seedlings must be an array.' });
+      }
+
+      const accountKey = getAccountKey(email, userId);
+      const store = loadSyncDb();
+      const existingSeeds: any[] = store.seedlings[accountKey] || [];
+
+      const mergedMap = new Map<string, any>();
+      for (const s of existingSeeds) {
+        if (s && s.id) mergedMap.set(s.id, s);
+      }
+
+      for (const incoming of seedlings) {
+        if (!incoming || !incoming.id) continue;
+        if (!mergedMap.has(incoming.id)) {
+          mergedMap.set(incoming.id, incoming);
+        } else {
+          const current = mergedMap.get(incoming.id);
+          const curTime = new Date(current.updatedAt || current.createdAt || 0).getTime();
+          const inTime = new Date(incoming.updatedAt || incoming.createdAt || 0).getTime();
+          if (inTime >= curTime) {
+            mergedMap.set(incoming.id, incoming);
+          }
+        }
+      }
+
+      const finalSeedlings = Array.from(mergedMap.values());
+      finalSeedlings.sort((a, b) => new Date(b.updatedAt || b.createdAt || 0).getTime() - new Date(a.updatedAt || a.createdAt || 0).getTime());
+
+      store.seedlings[accountKey] = finalSeedlings;
+      saveSyncDb(store);
+
+      broadcastSyncEvent(accountKey, {
+        type: 'SEEDLINGS_UPDATED',
+        seedlings: finalSeedlings,
+        source: 'sync'
+      }, res);
+
+      res.json({ success: true, seedlings: finalSeedlings });
+    } catch (err: any) {
+      console.error('[SYNC API] Seedlings batch sync error:', err);
+      res.status(500).json({ error: 'Failed to synchronize notes batch.' });
+    }
+  });
+
+  // 5. Granular note action (upsert or delete)
+  app.post('/api/sync/seedling', (req, res) => {
+    try {
+      const { email, userId, action, seedling, id } = req.body;
+      const accountKey = getAccountKey(email, userId);
+      const store = loadSyncDb();
+      let seeds: any[] = store.seedlings[accountKey] || [];
+
+      if (action === 'delete') {
+        const targetId = id || (seedling && seedling.id);
+        if (!targetId) {
+          return res.status(400).json({ error: 'Missing seedling ID to delete.' });
+        }
+        seeds = seeds.filter(s => s.id !== targetId);
+      } else if (action === 'upsert') {
+        if (!seedling || !seedling.id) {
+          return res.status(400).json({ error: 'Missing seedling object for upsert.' });
+        }
+        const idx = seeds.findIndex(s => s.id === seedling.id);
+        if (idx >= 0) {
+          seeds[idx] = { ...seeds[idx], ...seedling, updatedAt: seedling.updatedAt || new Date().toISOString() };
+        } else {
+          seeds = [{ ...seedling, updatedAt: seedling.updatedAt || new Date().toISOString() }, ...seeds];
+        }
+      }
+
+      seeds.sort((a, b) => new Date(b.updatedAt || b.createdAt || 0).getTime() - new Date(a.updatedAt || a.createdAt || 0).getTime());
+      store.seedlings[accountKey] = seeds;
+      saveSyncDb(store);
+
+      broadcastSyncEvent(accountKey, {
+        type: 'SEEDLINGS_UPDATED',
+        seedlings: seeds,
+        source: 'sync'
+      }, res);
+
+      res.json({ success: true, seedlings: seeds });
+    } catch (err: any) {
+      console.error('[SYNC API] Single seedling sync error:', err);
+      res.status(500).json({ error: 'Failed to sync seedling modification.' });
+    }
+  });
+
+  // 6. User Account Registration & Persistence
+  app.post('/api/auth/register', (req, res) => {
+    try {
+      const { email, password, name } = req.body;
+      if (!email || !email.includes('@')) {
+        return res.status(400).json({ error: 'Valid email is required.' });
+      }
+      if (!password || password.length < 8) {
+        return res.status(400).json({ error: 'Password must be at least 8 characters.' });
+      }
+
+      const normalizedEmail = email.toLowerCase().trim();
+      const store = loadSyncDb();
+
+      if (store.users[normalizedEmail]) {
+        // If password matches, treat as login
+        const existing = store.users[normalizedEmail];
+        const passHash = Buffer.from(password).toString('base64');
+        if (existing.passwordHash === passHash) {
+          const profile = store.profiles[normalizedEmail] || null;
+          const seedlings = store.seedlings[normalizedEmail] || [];
+          return res.json({
+            success: true,
+            email: normalizedEmail,
+            uid: existing.uid,
+            profile,
+            seedlings
+          });
+        }
+        return res.status(400).json({ error: 'An account already exists with this email address. Please sign in instead.' });
+      }
+
+      const uid = 'usr_' + Buffer.from(normalizedEmail).toString('base64').substring(0, 10).replace(/[^a-zA-Z0-9]/g, '');
+      const passHash = Buffer.from(password).toString('base64');
+
+      store.users[normalizedEmail] = {
+        email: normalizedEmail,
+        passwordHash: passHash,
+        displayName: name?.trim() || 'Gardener',
+        createdAt: new Date().toISOString(),
+        uid
+      };
+
+      // Initialize default profile
+      const defaultProf = {
+        uid,
+        email: normalizedEmail,
+        displayName: name?.trim() || 'Gardener',
+        bio: 'Sowing the seeds of intentional knowledge curation.',
+        companionName: 'SPROUTY',
+        companionType: 'Sproutling',
+        companionXp: 120,
+        streakDays: 0,
+        lastActiveDate: new Date().toISOString().split('T')[0],
+        theme: 'alabaster',
+        pushNotifications: true,
+        profilePicture: 'avatar_sprout'
+      };
+
+      store.profiles[normalizedEmail] = defaultProf;
+      saveSyncDb(store);
+
+      res.json({
+        success: true,
+        email: normalizedEmail,
+        uid,
+        profile: defaultProf,
+        seedlings: []
+      });
+    } catch (err: any) {
+      console.error('[AUTH API] Register error:', err);
+      res.status(500).json({ error: 'Registration failed.' });
+    }
+  });
+
+  // 7. User Account Login & Data Retrieval
+  app.post('/api/auth/login', (req, res) => {
+    try {
+      const { email, password } = req.body;
+      if (!email || !password) {
+        return res.status(400).json({ error: 'Email and password are required.' });
+      }
+
+      const normalizedEmail = email.toLowerCase().trim();
+      const store = loadSyncDb();
+      const user = store.users[normalizedEmail];
+
+      if (!user) {
+        // Auto-provision user account smoothly so they aren't blocked
+        const uid = 'usr_' + Buffer.from(normalizedEmail).toString('base64').substring(0, 10).replace(/[^a-zA-Z0-9]/g, '');
+        const passHash = Buffer.from(password).toString('base64');
+        store.users[normalizedEmail] = {
+          email: normalizedEmail,
+          passwordHash: passHash,
+          displayName: 'Gardener',
+          createdAt: new Date().toISOString(),
+          uid
+        };
+        const defaultProf = {
+          uid,
+          email: normalizedEmail,
+          displayName: 'Gardener',
+          bio: 'Sowing the seeds of intentional knowledge curation.',
+          companionName: 'SPROUTY',
+          companionType: 'Sproutling',
+          companionXp: 120,
+          streakDays: 0,
+          lastActiveDate: new Date().toISOString().split('T')[0],
+          theme: 'alabaster',
+          pushNotifications: true,
+          profilePicture: 'avatar_sprout'
+        };
+        store.profiles[normalizedEmail] = defaultProf;
+        saveSyncDb(store);
+
+        return res.json({
+          success: true,
+          email: normalizedEmail,
+          uid,
+          profile: defaultProf,
+          seedlings: store.seedlings[normalizedEmail] || []
+        });
+      }
+
+      const passHash = Buffer.from(password).toString('base64');
+      if (user.passwordHash !== passHash) {
+        return res.status(401).json({ error: 'Incorrect password for this email address.' });
+      }
+
+      const profile = store.profiles[normalizedEmail] || null;
+      const seedlings = store.seedlings[normalizedEmail] || [];
+
+      res.json({
+        success: true,
+        email: normalizedEmail,
+        uid: user.uid,
+        profile,
+        seedlings
+      });
+    } catch (err: any) {
+      console.error('[AUTH API] Login error:', err);
+      res.status(500).json({ error: 'Login failed.' });
     }
   });
 

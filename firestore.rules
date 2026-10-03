@@ -110,5 +110,10 @@ service cloud.firestore {
     match /users_auth_public/{email} {
       allow read, write: if isSignedIn();
     }
+
+    // Health check / Connection test document
+    match /test/connection {
+      allow read: if true;
+    }
   }
 }

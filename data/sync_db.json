@@ -1,0 +1,62 @@
+{
+  "users": {
+    "gardener_sync_test@synapze.io": {
+      "email": "gardener_sync_test@synapze.io",
+      "passwordHash": "UGFzc3dvcmQxMjMh",
+      "displayName": "Alex The Master Gardener",
+      "createdAt": "2026-10-03T07:09:11.240Z",
+      "uid": "usr_Z2FyZGVuZX"
+    }
+  },
+  "profiles": {
+    "gardener_sync_test@synapze.io": {
+      "uid": "usr_Z2FyZGVuZX",
+      "email": "gardener_sync_test@synapze.io",
+      "displayName": "Alex The Master Gardener",
+      "bio": "Updated from my mobile phone",
+      "companionName": "SPROUTY PRIME",
+      "companionType": "Sproutling",
+      "companionXp": 120,
+      "streakDays": 0,
+      "lastActiveDate": "2026-10-03",
+      "theme": "alabaster",
+      "pushNotifications": true,
+      "profilePicture": "avatar_sprout",
+      "updatedAt": "2026-10-03T07:09:11.273Z"
+    }
+  },
+  "seedlings": {
+    "gardener_sync_test@synapze.io": [
+      {
+        "id": "seed_phone_2",
+        "userId": "usr_Z2FyZGVuZX",
+        "title": "Note from Mobile Phone",
+        "content": "<p>Captured on the go!</p>",
+        "tags": [
+          "mobile"
+        ],
+        "isTask": false,
+        "isCompleted": false,
+        "status": "active",
+        "createdAt": "2026-10-03T07:09:11.266Z",
+        "updatedAt": "2026-10-03T07:09:11.266Z"
+      },
+      {
+        "id": "seed_laptop_1",
+        "userId": "usr_Z2FyZGVuZX",
+        "title": "Note from Laptop",
+        "content": "<p>Created on laptop screen</p>",
+        "tags": [
+          "laptop",
+          "synced"
+        ],
+        "isTask": true,
+        "isCompleted": false,
+        "status": "active",
+        "createdAt": "2026-10-03T07:09:11.250Z",
+        "updatedAt": "2026-10-03T07:09:11.250Z"
+      }
+    ]
+  },
+  "activities": {}
+}

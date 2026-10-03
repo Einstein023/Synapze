@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useGarden } from '../lib/gardenState';
-import { db, OperationType, handleFirestoreError } from '../firebase';
+import { db, auth, OperationType, handleFirestoreError } from '../firebase';
 import { 
   collection, 
   getDocs, 
@@ -76,7 +76,10 @@ export const AdminConsoleView: React.FC = () => {
 
   // Load all central admin data
   const loadAdminData = useCallback(async () => {
-    if (!isAdmin || isOffline || !db) return;
+    if (!isAdmin || isOffline || !db || !auth?.currentUser) {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     setError(null);
 
@@ -151,7 +154,7 @@ export const AdminConsoleView: React.FC = () => {
 
   // Load specific user's activities with limit to optimize network/rendering
   const inspectUser = async (user: GardenerProfile) => {
-    if (!db || isOffline) return;
+    if (!db || isOffline || !auth?.currentUser) return;
     setInspectedUser(user);
     setLoadingInspection(true);
     setInspectedUserActivities([]);

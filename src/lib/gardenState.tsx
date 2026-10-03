@@ -268,6 +268,7 @@ export const GardenProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [currentUserUid, setCurrentUserUid] = useState<string>('garden-guest');
   const [authProvider, setAuthProvider] = useState<string>('email');
+  const [firebaseAuthUser, setFirebaseAuthUser] = useState<any>(() => auth?.currentUser || null);
 
   const [xpPopups, setXpPopups] = useState<{ id: string; amount: number; source: string; timestamp: number }[]>([]);
   const [evolutionTrigger, setEvolutionTrigger] = useState<{ active: boolean; prevLevel: number; nextLevel: number; companionName: string; prevEmoji: string; nextEmoji: string; title: string } | null>(null);
@@ -287,19 +288,27 @@ export const GardenProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setXpPopups(prev => prev.filter(p => p.id !== id));
   };
 
-  // Trigger local state load from LocalStorage first
+  // Trigger local state load from LocalStorage first, then perform server synchronization
   useEffect(() => {
     // Attempt local state recovery or load guests defaults
-    const uid = localStorage.getItem('synapze_author_uid') || 'garden-guest';
-    setCurrentUserUid(uid);
-    const mockEmail = localStorage.getItem('synapze_author_email');
-    if (mockEmail) {
-      setUserEmail(mockEmail);
+    const storedEmail = localStorage.getItem('synapze_author_email');
+    const storedUid = localStorage.getItem('synapze_author_uid') || (storedEmail ? 'usr_' + btoa(storedEmail).substring(0, 10).replace(/[^a-zA-Z0-9]/g, '') : 'garden-guest');
+    
+    if (storedEmail) {
+      setUserEmail(storedEmail);
       setIsAuthenticated(true);
+      setCurrentUserUid(storedUid);
+    } else {
+      setCurrentUserUid(storedUid);
     }
 
-    recoveryLocalStorage(uid);
+    recoveryLocalStorage(storedUid);
     setLoading(false);
+
+    // Immediately synchronize with server store
+    if (storedEmail || (storedUid && storedUid !== 'garden-guest')) {
+      fetchServerSync(storedEmail, storedUid);
+    }
   }, []);
 
   // Monitor live Firebase Auth transitions if firebase is active
@@ -340,6 +349,7 @@ export const GardenProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           }
         }
 
+        setFirebaseAuthUser(user);
         setIsAuthenticated(true);
         setUserEmail(user.email);
         setCurrentUserUid(user.uid);
@@ -356,6 +366,7 @@ export const GardenProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
         localStorage.setItem('synapze_author_uid', user.uid);
         localStorage.setItem('synapze_author_email', user.email || '');
+        localStorage.setItem('synapze_is_authenticated', 'true');
 
         // Migrate guest notes if present to prevent any loss of notes created prior to sign in
         const guestSeedStr = localStorage.getItem('synapze_seed_garden-guest');
@@ -382,28 +393,113 @@ export const GardenProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         // Immediate local recovery for user.uid so UI has notes before network responds
         recoveryLocalStorage(user.uid);
         
-        // Load documents from Firestore if online
+        // Synchronize with server backend & Firestore
+        fetchServerSync(user.email, user.uid);
         if (!isOffline) {
           await pullFirestoreData(user.uid);
         }
       } else {
-        // Fall back to local if signed out
-        setIsAuthenticated(false);
-        setUserEmail(null);
-        setCurrentUserUid('garden-guest');
-        localStorage.removeItem('synapze_author_uid');
-        localStorage.removeItem('synapze_author_email');
-        recoveryLocalStorage('garden-guest');
+        setFirebaseAuthUser(null);
+        // Do NOT wipe session on reload if user is authenticated via email or persistent session!
+        const storedEmail = localStorage.getItem('synapze_author_email');
+        const isAuthActive = localStorage.getItem('synapze_is_authenticated') === 'true';
+        if (!storedEmail && !isAuthActive) {
+          setIsAuthenticated(false);
+          setUserEmail(null);
+          setCurrentUserUid('garden-guest');
+          localStorage.removeItem('synapze_author_uid');
+          localStorage.removeItem('synapze_author_email');
+          recoveryLocalStorage('garden-guest');
+        }
       }
     });
 
     return () => unsubscribe();
   }, [isOffline]);
 
-  // Live multi-device synchronization via Firestore onSnapshot
-  // When a user updates notes on another device (e.g. mobile or laptop), this listener instantly syncs changes
+  // Real-time Server-Sent Events (SSE) listener for multi-device sync (e.g. laptop <-> mobile)
   useEffect(() => {
-    if (!isFirebaseConfigured || !db || isOffline || !isAuthenticated || currentUserUid === 'garden-guest') {
+    if (typeof window === 'undefined') return;
+    const effEmail = userEmail || localStorage.getItem('synapze_author_email');
+    const effUid = currentUserUid !== 'garden-guest' ? currentUserUid : localStorage.getItem('synapze_author_uid');
+    
+    if (!effEmail && (!effUid || effUid === 'garden-guest')) return;
+
+    const q = new URLSearchParams();
+    if (effEmail) q.set('email', effEmail);
+    if (effUid) q.set('userId', effUid);
+
+    let es: EventSource | null = null;
+    try {
+      es = new EventSource(`/api/sync/events?${q.toString()}`);
+
+      es.onmessage = (event) => {
+        try {
+          const payload = JSON.parse(event.data);
+          if (payload.type === 'PROFILE_UPDATED' && payload.profile) {
+            setProfile(prev => {
+              const updated = { ...prev, ...payload.profile };
+              const currentUid = effUid || 'garden-guest';
+              localStorage.setItem(`synapze_prof_${currentUid}`, JSON.stringify(updated));
+              if (updated.displayName) {
+                localStorage.setItem(`synapze_user_name_${currentUid}`, updated.displayName);
+              }
+              return updated;
+            });
+          } else if (payload.type === 'SEEDLINGS_UPDATED' && Array.isArray(payload.seedlings)) {
+            setSeedlings(payload.seedlings);
+            const currentUid = effUid || 'garden-guest';
+            localStorage.setItem(`synapze_seed_${currentUid}`, JSON.stringify(payload.seedlings));
+            localStorage.setItem('synapze_all_saved_notes', JSON.stringify(payload.seedlings));
+          }
+        } catch {
+          // ignore malformed SSE messages
+        }
+      };
+    } catch (e) {
+      console.warn('[SSE] EventSource init failed:', e);
+    }
+
+    return () => {
+      if (es) {
+        es.close();
+      }
+    };
+  }, [userEmail, currentUserUid]);
+
+  // Trigger sync on window focus and tab visibility change (e.g. when waking mobile device or switching tabs)
+  useEffect(() => {
+    const handleSyncTrigger = () => {
+      const effEmail = userEmail || localStorage.getItem('synapze_author_email');
+      const effUid = currentUserUid !== 'garden-guest' ? currentUserUid : localStorage.getItem('synapze_author_uid');
+      if (effEmail || (effUid && effUid !== 'garden-guest')) {
+        fetchServerSync(effEmail, effUid);
+      }
+    };
+
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        handleSyncTrigger();
+      }
+    };
+
+    window.addEventListener('focus', handleSyncTrigger);
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    // Periodic sync poll every 15s to guarantee fresh state across mobile and desktop
+    const pollInterval = setInterval(handleSyncTrigger, 15000);
+
+    return () => {
+      window.removeEventListener('focus', handleSyncTrigger);
+      document.removeEventListener('visibilitychange', handleVisibility);
+      clearInterval(pollInterval);
+    };
+  }, [userEmail, currentUserUid]);
+
+  // Live multi-device synchronization via Firestore onSnapshot
+  // ONLY attach Firestore listeners when an authenticated Firebase user is signed in matching currentUserUid
+  useEffect(() => {
+    if (!isFirebaseConfigured || !db || isOffline || !firebaseAuthUser || firebaseAuthUser.uid !== currentUserUid || currentUserUid === 'garden-guest') {
       return;
     }
 
@@ -448,7 +544,9 @@ export const GardenProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         return finalSeedlings;
       });
     }, (error) => {
-      handleFirestoreError(error, OperationType.GET, seedColPath);
+      if (auth?.currentUser && auth.currentUser.uid === currentUserUid) {
+        handleFirestoreError(error, OperationType.GET, seedColPath);
+      }
     });
 
     const profPath = `users/${currentUserUid}`;
@@ -464,14 +562,16 @@ export const GardenProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         });
       }
     }, (error) => {
-      handleFirestoreError(error, OperationType.GET, profPath);
+      if (auth?.currentUser && auth.currentUser.uid === currentUserUid) {
+        handleFirestoreError(error, OperationType.GET, profPath);
+      }
     });
 
     return () => {
       unsubscribeSeedlings();
       unsubscribeProfile();
     };
-  }, [isAuthenticated, currentUserUid, isOffline]);
+  }, [firebaseAuthUser, currentUserUid, isOffline]);
 
   // Handle native online/offline change events cleanly
   useEffect(() => {
@@ -655,9 +755,109 @@ export const GardenProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   };
 
+  // Fetch and synchronize data with the backend server store
+  const fetchServerSync = async (targetEmail?: string | null, targetUid?: string) => {
+    const effEmail = targetEmail !== undefined ? targetEmail : userEmail;
+    const effUid = targetUid || currentUserUid;
+    if (!effEmail && (!effUid || effUid === 'garden-guest')) return;
+
+    try {
+      const q = new URLSearchParams();
+      if (effEmail) q.set('email', effEmail);
+      if (effUid) q.set('userId', effUid);
+
+      const res = await fetch(`/api/sync?${q.toString()}`);
+      if (!res.ok) return;
+      const data = await res.json();
+      if (!data.success) return;
+
+      // 1. Synchronize Profile
+      if (data.profile) {
+        setProfile(prev => {
+          const serverName = data.profile.displayName;
+          const localName = prev.displayName;
+          const hasCustomServerName = serverName && serverName !== 'Gardener';
+          const hasCustomLocalName = localName && localName !== 'Gardener';
+          
+          let effectiveName = localName;
+          if (hasCustomServerName) {
+            effectiveName = serverName;
+          } else if (hasCustomLocalName) {
+            effectiveName = localName;
+            // Push custom local name up to server
+            fetch('/api/sync/profile', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ email: effEmail, userId: effUid, profile: { ...data.profile, displayName: localName } })
+            }).catch(() => {});
+          }
+
+          const mergedProf: GardenerProfile = {
+            ...prev,
+            ...data.profile,
+            displayName: effectiveName
+          };
+
+          const uidKey = effUid || 'garden-guest';
+          localStorage.setItem(`synapze_prof_${uidKey}`, JSON.stringify(mergedProf));
+          localStorage.setItem(`synapze_user_name_${uidKey}`, effectiveName);
+          return mergedProf;
+        });
+      }
+
+      // 2. Synchronize Seedlings (Two-way reconciliation so no notes are lost)
+      if (Array.isArray(data.seedlings)) {
+        setSeedlings(prev => {
+          const mergedMap = new Map<string, SeedlingNode>();
+          
+          for (const rem of data.seedlings) {
+            if (rem && rem.id) mergedMap.set(rem.id, rem);
+          }
+
+          let hasLocalAdditions = false;
+          for (const loc of prev) {
+            if (!loc || !loc.id) continue;
+            if (!mergedMap.has(loc.id)) {
+              mergedMap.set(loc.id, loc);
+              hasLocalAdditions = true;
+            } else {
+              const rem = mergedMap.get(loc.id)!;
+              const locTime = new Date(loc.updatedAt || loc.createdAt || 0).getTime();
+              const remTime = new Date(rem.updatedAt || rem.createdAt || 0).getTime();
+              if (locTime > remTime) {
+                mergedMap.set(loc.id, loc);
+                hasLocalAdditions = true;
+              }
+            }
+          }
+
+          const finalSeedlings = Array.from(mergedMap.values());
+          finalSeedlings.sort((a, b) => new Date(b.updatedAt || b.createdAt || 0).getTime() - new Date(a.updatedAt || a.createdAt || 0).getTime());
+
+          const uidKey = effUid || 'garden-guest';
+          localStorage.setItem(`synapze_seed_${uidKey}`, JSON.stringify(finalSeedlings));
+          localStorage.setItem('synapze_all_saved_notes', JSON.stringify(finalSeedlings));
+
+          // If local device had unsynced notes, sync them up to the server
+          if (hasLocalAdditions) {
+            fetch('/api/sync/seedlings', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ email: effEmail, userId: effUid, seedlings: finalSeedlings })
+            }).catch(() => {});
+          }
+
+          return finalSeedlings;
+        });
+      }
+    } catch (err) {
+      console.warn('[SYNC CLIENT] Background sync error:', err);
+    }
+  };
+
   // Pull data from firestore
   const pullFirestoreData = async (uid: string) => {
-    if (!isFirebaseConfigured || !db || isOffline) return;
+    if (!isFirebaseConfigured || !db || isOffline || !auth?.currentUser || auth.currentUser.uid !== uid || uid === 'garden-guest') return;
 
     try {
       const { doc, getDoc, setDoc, collection, getDocs } = await import('firebase/firestore');
@@ -817,7 +1017,7 @@ export const GardenProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   // Push local storage cached items up to Firestore (Sync Engine)
   const syncLocalToFirestore = async (uid: string) => {
-    if (!isFirebaseConfigured || !db || isOffline) return;
+    if (!isFirebaseConfigured || !db || isOffline || !auth?.currentUser || auth.currentUser.uid !== uid || uid === 'garden-guest') return;
     setIsSyncing(true);
 
     try {
@@ -877,124 +1077,174 @@ export const GardenProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   };
 
-  // Mock Email sign in to demonstrate credentials flows cleanly
+  // Email sign in with persistent server-side account synchronization
   const simulateEmailSignIn = async (email: string) => {
     const normalizedEmail = email.toLowerCase().trim();
-    const fakeUid = 'usr_' + btoa(normalizedEmail).substring(0, 10).replace(/=/g, '');
-    
-    // Register temporary sandbox profile in credentials registry
-    initRegistryUser(normalizedEmail, "garden123");
-
-    setIsAuthenticated(true);
-    setUserEmail(normalizedEmail);
-    setCurrentUserUid(fakeUid);
-    localStorage.setItem('synapze_author_uid', fakeUid);
-    localStorage.setItem('synapze_author_email', normalizedEmail);
-    
     setLoading(true);
-    if (isFirebaseConfigured && !isOffline) {
-      await pullFirestoreData(fakeUid);
-    } else {
-      recoveryLocalStorage(fakeUid);
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: normalizedEmail, password: 'gardenPassword123' })
+      });
+      const data = await res.json();
+      const uid = data.uid || ('usr_' + btoa(normalizedEmail).substring(0, 10).replace(/[^a-zA-Z0-9]/g, ''));
+      
+      setIsAuthenticated(true);
+      setUserEmail(normalizedEmail);
+      setCurrentUserUid(uid);
+      localStorage.setItem('synapze_author_uid', uid);
+      localStorage.setItem('synapze_author_email', normalizedEmail);
+      localStorage.setItem('synapze_is_authenticated', 'true');
+
+      if (data.profile) {
+        setProfile(data.profile);
+        localStorage.setItem(`synapze_prof_${uid}`, JSON.stringify(data.profile));
+      }
+      if (Array.isArray(data.seedlings) && data.seedlings.length > 0) {
+        setSeedlings(data.seedlings);
+        localStorage.setItem(`synapze_seed_${uid}`, JSON.stringify(data.seedlings));
+        localStorage.setItem('synapze_all_saved_notes', JSON.stringify(data.seedlings));
+      } else {
+        recoveryLocalStorage(uid);
+      }
+      await fetchServerSync(normalizedEmail, uid);
+      triggerPushNotification('Welcome', `Logged in as ${normalizedEmail}`, 'achievement');
+    } catch {
+      recoveryLocalStorage('usr_' + btoa(normalizedEmail).substring(0, 10).replace(/[^a-zA-Z0-9]/g, ''));
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
-    
-    triggerPushNotification('Welcome', `Logged in as ${normalizedEmail}`, 'achievement');
   };
 
   const signInWithGoogle = async () => {
     if (!isFirebaseConfigured) {
-      throw new Error("Firebase in sandbox mode is active. Fill parameters under Configuration.");
+      throw new Error("Firebase is not fully configured for Google sign-in.");
     }
     const { signInWithPopup, GoogleAuthProvider } = await import('firebase/auth');
     const provider = new GoogleAuthProvider();
     provider.setCustomParameters({ prompt: 'select_account' });
-    await signInWithPopup(auth, provider);
+    const result = await signInWithPopup(auth, provider);
+    if (result.user) {
+      const normalizedEmail = (result.user.email || '').toLowerCase().trim();
+      const uid = result.user.uid;
+      setIsAuthenticated(true);
+      setUserEmail(normalizedEmail);
+      setCurrentUserUid(uid);
+      localStorage.setItem('synapze_author_uid', uid);
+      localStorage.setItem('synapze_author_email', normalizedEmail);
+      localStorage.setItem('synapze_is_authenticated', 'true');
+      await fetchServerSync(normalizedEmail, uid);
+    }
   };
 
   const signInWithEmail = async (email: string, password: string) => {
     const normalizedEmail = email.toLowerCase().trim();
+    setLoading(true);
 
-    if (isFirebaseConfigured && auth) {
-      try {
-        const { signInWithEmailAndPassword } = await import('firebase/auth');
-        await signInWithEmailAndPassword(auth, email, password);
-        return;
-      } catch (err: any) {
-        if (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential') {
-          throw new Error("No account found with these credentials, or incorrect password.");
-        }
-        if (err.code === 'auth/wrong-password') {
-          throw new Error("Incorrect password. Please try again or use Forgot Password.");
-        }
-        // Fallback to local sandbox login if Firebase Email auth provider is disabled or offline
-        console.warn("Firebase email auth unavailable or disabled, falling back to local sign-in:", err);
+    // 1. Authenticate with server auth endpoint (reliable across all devices)
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: normalizedEmail, password })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Login failed. Please check your credentials.');
       }
-    }
 
-    // Local fallback sign in
-    let reg = getRegistry();
-    const userRecord = reg[normalizedEmail];
-    if (!userRecord) {
-      initRegistryUser(normalizedEmail, password);
-    } else if (userRecord.passwordHash !== btoa(password)) {
-      throw new Error("Incorrect password for this email address.");
+      const uid = data.uid || ('usr_' + btoa(normalizedEmail).substring(0, 10).replace(/[^a-zA-Z0-9]/g, ''));
+      setIsAuthenticated(true);
+      setUserEmail(normalizedEmail);
+      setCurrentUserUid(uid);
+      localStorage.setItem('synapze_author_uid', uid);
+      localStorage.setItem('synapze_author_email', normalizedEmail);
+      localStorage.setItem('synapze_is_authenticated', 'true');
+
+      if (data.profile) {
+        setProfile(data.profile);
+        localStorage.setItem(`synapze_prof_${uid}`, JSON.stringify(data.profile));
+        if (data.profile.displayName) {
+          localStorage.setItem(`synapze_user_name_${uid}`, data.profile.displayName);
+        }
+      }
+      if (Array.isArray(data.seedlings) && data.seedlings.length > 0) {
+        setSeedlings(data.seedlings);
+        localStorage.setItem(`synapze_seed_${uid}`, JSON.stringify(data.seedlings));
+        localStorage.setItem('synapze_all_saved_notes', JSON.stringify(data.seedlings));
+      }
+
+      // Also attempt live Firebase sign in in background
+      if (isFirebaseConfigured && auth) {
+        import('firebase/auth').then(({ signInWithEmailAndPassword }) => {
+          signInWithEmailAndPassword(auth, email, password).catch(() => {});
+        }).catch(() => {});
+      }
+
+      await fetchServerSync(normalizedEmail, uid);
+      triggerPushNotification('Welcome Back!', `Signed in as ${normalizedEmail}`, 'achievement');
+    } finally {
+      setLoading(false);
     }
-    await simulateEmailSignIn(email);
   };
 
   const signUpWithEmail = async (email: string, password: string, name?: string) => {
     const normalizedEmail = email.toLowerCase().trim();
     const trimmedName = name?.trim();
+    setLoading(true);
 
-    if (isFirebaseConfigured && auth) {
-      try {
-        const { createUserWithEmailAndPassword, updateProfile: updateAuthProfile } = await import('firebase/auth');
-        const userCred = await createUserWithEmailAndPassword(auth, email, password);
-        if (trimmedName && userCred.user) {
-          await updateAuthProfile(userCred.user, { displayName: trimmedName }).catch(() => {});
-          localStorage.setItem(`synapze_name_configured_${userCred.user.uid}`, 'true');
-          localStorage.setItem(`synapze_user_name_${userCred.user.uid}`, trimmedName);
-          updateProfile({ displayName: trimmedName });
-        }
-        return;
-      } catch (err: any) {
-        if (err.code === 'auth/email-already-in-use') {
-          throw new Error("An account is already registered with this email address. Please sign in instead.");
-        }
-        // Fallback to local sandbox signup if Firebase Email auth provider is disabled or offline
-        console.warn("Firebase email auth unavailable or disabled, falling back to local sign-up:", err);
+    // 1. Register with server auth endpoint (reliable across all devices)
+    try {
+      const res = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: normalizedEmail, password, name: trimmedName })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Registration failed. Please check your credentials.');
       }
-    }
 
-    let reg = getRegistry();
-    if (reg[normalizedEmail]) {
-      throw new Error("An account is already registered with this email address. Please sign in instead.");
-    }
-    const newRecord: RegistryUser = {
-      email: normalizedEmail,
-      passwordHash: btoa(password),
-      status: 'active',
-      deactivatedAt: null,
-      otpCode: null,
-      otpExpiresAt: null
-    };
-    reg[normalizedEmail] = newRecord;
-    saveRegistry(reg);
-    await simulateEmailSignIn(email);
+      const uid = data.uid || ('usr_' + btoa(normalizedEmail).substring(0, 10).replace(/[^a-zA-Z0-9]/g, ''));
+      setIsAuthenticated(true);
+      setUserEmail(normalizedEmail);
+      setCurrentUserUid(uid);
+      localStorage.setItem('synapze_author_uid', uid);
+      localStorage.setItem('synapze_author_email', normalizedEmail);
+      localStorage.setItem('synapze_is_authenticated', 'true');
 
-    if (trimmedName) {
-      const activeUid = currentUserUid || 'garden-guest';
-      localStorage.setItem(`synapze_name_configured_${activeUid}`, 'true');
-      localStorage.setItem(`synapze_user_name_${activeUid}`, trimmedName);
-      updateProfile({ displayName: trimmedName });
-    }
+      if (data.profile) {
+        const customProfile = trimmedName ? { ...data.profile, displayName: trimmedName } : data.profile;
+        setProfile(customProfile);
+        localStorage.setItem(`synapze_prof_${uid}`, JSON.stringify(customProfile));
+        if (customProfile.displayName) {
+          localStorage.setItem(`synapze_user_name_${uid}`, customProfile.displayName);
+        }
+      }
 
-    triggerPushNotification(
-      'Account Created', 
-      `Welcome to Synapze Garden, ${trimmedName || normalizedEmail}!`, 
-      'system'
-    );
+      // Also attempt live Firebase signup in background
+      if (isFirebaseConfigured && auth) {
+        import('firebase/auth').then(({ createUserWithEmailAndPassword, updateProfile: updateAuthProfile }) => {
+          createUserWithEmailAndPassword(auth, email, password)
+            .then(cred => {
+              if (trimmedName && cred.user) {
+                updateAuthProfile(cred.user, { displayName: trimmedName }).catch(() => {});
+              }
+            })
+            .catch(() => {});
+        }).catch(() => {});
+      }
+
+      await fetchServerSync(normalizedEmail, uid);
+      triggerPushNotification(
+        'Account Created', 
+        `Welcome to Synapze Garden, ${trimmedName || normalizedEmail}!`, 
+        'system'
+      );
+    } finally {
+      setLoading(false);
+    }
   };
 
   const signOutUser = async () => {
@@ -1008,6 +1258,7 @@ export const GardenProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setCurrentUserUid('garden-guest');
     localStorage.removeItem('synapze_author_uid');
     localStorage.removeItem('synapze_author_email');
+    localStorage.removeItem('synapze_is_authenticated');
     recoveryLocalStorage('garden-guest');
     triggerPushNotification('Signed Out', 'Signed out successfully.', 'system');
   };
@@ -1023,8 +1274,20 @@ export const GardenProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         localStorage.setItem(`synapze_user_name_${currentUserUid}`, updated.displayName);
       }
 
-      // Background save to firebase if online
-      if (isFirebaseConfigured && !isOffline && currentUserUid !== 'garden-guest') {
+      // Synchronize to backend server for cross-device updates (phone <-> laptop)
+      const effEmail = userEmail || localStorage.getItem('synapze_author_email') || updated.email;
+      fetch('/api/sync/profile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: effEmail,
+          userId: currentUserUid,
+          profile: updated
+        })
+      }).catch(err => console.warn('[SYNC CLIENT] Failed to post profile sync:', err));
+
+      // Background save to firebase if online and authenticated
+      if (isFirebaseConfigured && !isOffline && auth?.currentUser && currentUserUid !== 'garden-guest') {
         const pRef = doc(db, 'users', currentUserUid);
         setDoc(pRef, updated).catch(err => {
           handleFirestoreError(err, OperationType.WRITE, `users/${currentUserUid}`);
@@ -1061,8 +1324,21 @@ export const GardenProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     awardCompanionXp(15);
     logActivity(`Planted seedling: "${newSeed.title}"`, 15);
 
-    // Save to Firestore asynchronously in background without blocking local return
-    if (isFirebaseConfigured && !isOffline && currentUserUid !== 'garden-guest') {
+    // Synchronize to backend server for instant cross-device updates
+    const effEmail = userEmail || localStorage.getItem('synapze_author_email');
+    fetch('/api/sync/seedling', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: effEmail,
+        userId: currentUserUid,
+        action: 'upsert',
+        seedling: newSeed
+      })
+    }).catch(err => console.warn('[SYNC CLIENT] Failed to post seedling sync:', err));
+
+    // Save to Firestore asynchronously in background if live user is authenticated
+    if (isFirebaseConfigured && !isOffline && auth?.currentUser && currentUserUid !== 'garden-guest') {
       const sRef = doc(db, 'users', currentUserUid, 'seedlings', newId);
       setDoc(sRef, newSeed).catch(err => {
         handleFirestoreError(err, OperationType.WRITE, `users/${currentUserUid}/seedlings/${newId}`);
@@ -1076,12 +1352,12 @@ export const GardenProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   // Seedling Update API
   const updateSeedling = async (id: string, updates: Partial<SeedlingNode>) => {
-    let title = '';
     setSeedlings(prev => {
+      let targetSeed: SeedlingNode | null = null;
       const updated = prev.map(s => {
         if (s.id === id) {
-          title = s.title;
           const merged = { ...s, ...updates, updatedAt: new Date().toISOString() };
+          targetSeed = merged;
           
           if (updates.isCompleted && !s.isCompleted) {
             awardCompanionXp(10);
@@ -1106,12 +1382,26 @@ export const GardenProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       localStorage.setItem(`synapze_seed_${currentUserUid}`, JSON.stringify(updated));
       localStorage.setItem('synapze_all_saved_notes', JSON.stringify(updated));
       
-      const updatedDoc = updated.find(s => s.id === id);
-      if (updatedDoc && isFirebaseConfigured && !isOffline && currentUserUid !== 'garden-guest') {
-        const sRef = doc(db, 'users', currentUserUid, 'seedlings', id);
-        setDoc(sRef, updatedDoc).catch(err => {
-          handleFirestoreError(err, OperationType.WRITE, `users/${currentUserUid}/seedlings/${id}`);
-        });
+      if (targetSeed) {
+        // Synchronize to backend server for cross-device updates
+        const effEmail = userEmail || localStorage.getItem('synapze_author_email');
+        fetch('/api/sync/seedling', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: effEmail,
+            userId: currentUserUid,
+            action: 'upsert',
+            seedling: targetSeed
+          })
+        }).catch(err => console.warn('[SYNC CLIENT] Failed to post seedling update:', err));
+
+        if (isFirebaseConfigured && !isOffline && auth?.currentUser && currentUserUid !== 'garden-guest') {
+          const sRef = doc(db, 'users', currentUserUid, 'seedlings', id);
+          setDoc(sRef, targetSeed).catch(err => {
+            handleFirestoreError(err, OperationType.WRITE, `users/${currentUserUid}/seedlings/${id}`);
+          });
+        }
       }
       return updated;
     });
@@ -1131,7 +1421,20 @@ export const GardenProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         triggerHaptic([30, 40, 10]);
       }
 
-      if (isFirebaseConfigured && !isOffline && currentUserUid !== 'garden-guest') {
+      // Synchronize deletion to backend server for cross-device updates
+      const effEmail = userEmail || localStorage.getItem('synapze_author_email');
+      fetch('/api/sync/seedling', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: effEmail,
+          userId: currentUserUid,
+          action: 'delete',
+          id
+        })
+      }).catch(err => console.warn('[SYNC CLIENT] Failed to post seedling delete:', err));
+
+      if (isFirebaseConfigured && !isOffline && auth?.currentUser && currentUserUid !== 'garden-guest') {
         const sRef = doc(db, 'users', currentUserUid, 'seedlings', id);
         deleteDoc(sRef).catch(err => {
           handleFirestoreError(err, OperationType.DELETE, `users/${currentUserUid}/seedlings/${id}`);
