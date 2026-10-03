@@ -7,7 +7,8 @@ import {
   deleteDoc, 
   collection, 
   getDocs, 
-  writeBatch 
+  writeBatch,
+  onSnapshot 
 } from 'firebase/firestore';
 import { 
   GardenerProfile, 
@@ -398,6 +399,79 @@ export const GardenProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     return () => unsubscribe();
   }, [isOffline]);
+
+  // Live multi-device synchronization via Firestore onSnapshot
+  // When a user updates notes on another device (e.g. mobile or laptop), this listener instantly syncs changes
+  useEffect(() => {
+    if (!isFirebaseConfigured || !db || isOffline || !isAuthenticated || currentUserUid === 'garden-guest') {
+      return;
+    }
+
+    const seedColPath = `users/${currentUserUid}/seedlings`;
+    const seedCol = collection(db, 'users', currentUserUid, 'seedlings');
+
+    const unsubscribeSeedlings = onSnapshot(seedCol, (snapshot) => {
+      const remoteSeedlings: SeedlingNode[] = [];
+      snapshot.forEach((docSnap) => {
+        const data = docSnap.data() as SeedlingNode;
+        if (data && data.id) {
+          remoteSeedlings.push(data);
+        }
+      });
+
+      // Synchronize into state & localStorage while respecting recent local in-flight edits
+      setSeedlings(prev => {
+        const mergedMap = new Map<string, SeedlingNode>();
+        for (const rem of remoteSeedlings) {
+          mergedMap.set(rem.id, rem);
+        }
+
+        // Keep any local notes that haven't synced to Firestore yet
+        for (const loc of prev) {
+          if (!mergedMap.has(loc.id)) {
+            mergedMap.set(loc.id, loc);
+          } else {
+            const rem = mergedMap.get(loc.id)!;
+            const locTime = new Date(loc.updatedAt || loc.createdAt || 0).getTime();
+            const remTime = new Date(rem.updatedAt || rem.createdAt || 0).getTime();
+            if (locTime > remTime) {
+              mergedMap.set(loc.id, loc);
+            }
+          }
+        }
+
+        const finalSeedlings = Array.from(mergedMap.values());
+        finalSeedlings.sort((a, b) => new Date(b.updatedAt || b.createdAt || 0).getTime() - new Date(a.updatedAt || a.createdAt || 0).getTime());
+
+        localStorage.setItem(`synapze_seed_${currentUserUid}`, JSON.stringify(finalSeedlings));
+        localStorage.setItem('synapze_all_saved_notes', JSON.stringify(finalSeedlings));
+        return finalSeedlings;
+      });
+    }, (error) => {
+      handleFirestoreError(error, OperationType.GET, seedColPath);
+    });
+
+    const profPath = `users/${currentUserUid}`;
+    const profRef = doc(db, 'users', currentUserUid);
+
+    const unsubscribeProfile = onSnapshot(profRef, (docSnap) => {
+      if (docSnap.exists()) {
+        const remoteProf = docSnap.data() as GardenerProfile;
+        setProfile(prev => {
+          const merged = { ...prev, ...remoteProf };
+          localStorage.setItem(`synapze_prof_${currentUserUid}`, JSON.stringify(merged));
+          return merged;
+        });
+      }
+    }, (error) => {
+      handleFirestoreError(error, OperationType.GET, profPath);
+    });
+
+    return () => {
+      unsubscribeSeedlings();
+      unsubscribeProfile();
+    };
+  }, [isAuthenticated, currentUserUid, isOffline]);
 
   // Handle native online/offline change events cleanly
   useEffect(() => {
