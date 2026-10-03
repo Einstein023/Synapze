@@ -26,6 +26,7 @@ import {
   Loader2
 } from 'lucide-react';
 import { stripFormatting } from '../lib/editorUtils';
+import { DeleteNoteModal } from './DeleteNoteModal';
 
 export const PulsingLeaf: React.FC = () => {
   return (
@@ -101,6 +102,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     seedlings, 
     activities, 
     updateSeedling, 
+    deleteSeedling,
     triggerPushNotification,
     updateProfile,
     userEmail
@@ -110,6 +112,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [newCareText, setNewCareText] = useState('');
   const [activeGraphFilter, setActiveGraphFilter] = useState<'all' | 'notes' | 'tasks' | 'archive' | 'ideas'>('all');
+  const [noteToDelete, setNoteToDelete] = useState<SeedlingNode | null>(null);
 
   // Garden Growth Report states
   const [showReportModal, setShowReportModal] = useState(false);
@@ -566,29 +569,38 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                     whileHover={{ y: -4, scale: 1.015, boxShadow: "0 12px 30px -10px rgba(32, 61, 54, 0.15)" }}
                     whileTap={{ scale: 0.985 }}
                     transition={{ type: "spring", stiffness: 400, damping: 25 }}
-                    className={`p-6 rounded-[1.8rem] border flex flex-col justify-between h-[210px] text-left cursor-pointer transition-all duration-300 ${cardStyle.container}`}
+                    className={`p-6 rounded-[1.8rem] border flex flex-col justify-between h-[210px] text-left cursor-pointer transition-all duration-300 ${cardStyle.container} group relative`}
                   >
                     <div className="space-y-2">
-                      <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-start justify-between gap-2">
                         <h3 className={`font-serif font-bold text-lg tracking-tight line-clamp-1 flex-1 transition-all duration-300 ${seed.isTask && seed.isCompleted ? 'line-through opacity-50' : ''}`}>
                           {seed.title}
                         </h3>
-                        {seed.isTask ? (
+                        <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
+                          {seed.isTask ? (
+                            <button
+                              onClick={() => updateSeedling(seed.id, { isCompleted: !seed.isCompleted })}
+                              className="p-1 rounded-full hover:bg-black/5 transition-colors cursor-pointer text-slate-800 hover:text-emerald-800"
+                              title={seed.isCompleted ? "Mark as open task" : "Mark as completed"}
+                            >
+                              <CheckCircle2 className={`w-5 h-5 transition-all ${seed.isCompleted ? 'text-emerald-700 fill-emerald-100 stroke-[2.5]' : 'text-slate-500/60 stroke-[1.5]'}`} />
+                            </button>
+                          ) : (
+                            <div className="p-1 text-slate-500/50" title="Reference Note">
+                              <FileText className="w-4.5 h-4.5 stroke-[1.8]" />
+                            </div>
+                          )}
+
+                          {/* Quick Compost / Delete action on card */}
                           <button
-                            onClick={(e) => {
-                              e.stopPropagation(); // Avoid navigating to the editor
-                              updateSeedling(seed.id, { isCompleted: !seed.isCompleted });
-                            }}
-                            className="p-1 rounded-full hover:bg-black/5 transition-colors cursor-pointer text-slate-800 hover:text-emerald-800 shrink-0"
-                            title={seed.isCompleted ? "Mark as open task" : "Mark as completed"}
+                            onClick={() => setNoteToDelete(seed)}
+                            className="p-1 rounded-lg text-slate-400 hover:text-[#b9382c] hover:bg-black/5 opacity-80 group-hover:opacity-100 transition-all cursor-pointer"
+                            title="Compost / Delete Note"
+                            aria-label="Delete Note"
                           >
-                            <CheckCircle2 className={`w-5 h-5 transition-all ${seed.isCompleted ? 'text-emerald-700 fill-emerald-100 stroke-[2.5]' : 'text-slate-500/60 stroke-[1.5]'}`} />
+                            <Trash2 className="w-3.5 h-3.5" />
                           </button>
-                        ) : (
-                          <div className="p-1 text-slate-500/50 shrink-0" title="Reference Note">
-                            <FileText className="w-4.5 h-4.5 stroke-[1.8]" />
-                          </div>
-                        )}
+                        </div>
                       </div>
                       
                       {/* Clean preview using stripped formatted markdown snippet */}
@@ -1017,6 +1029,31 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             </div>
           </motion.div>
         </div>
+      )}
+
+      {/* Delete Confirmation Modal adhering to Synapze Design System */}
+      {noteToDelete && (
+        <DeleteNoteModal
+          isOpen={Boolean(noteToDelete)}
+          onClose={() => setNoteToDelete(null)}
+          onConfirm={async () => {
+            const id = noteToDelete.id;
+            const title = noteToDelete.title || 'Untitled Note';
+            setNoteToDelete(null);
+            await deleteSeedling(id);
+            triggerPushNotification('Note Composted', `"${title}" was pruned and deleted.`, 'system');
+          }}
+          noteTitle={noteToDelete.title || 'Untitled Note'}
+          noteSnippet={stripFormatting(noteToDelete.content).slice(0, 140)}
+          noteTags={noteToDelete.tags}
+          onArchiveInstead={async () => {
+            const id = noteToDelete.id;
+            const title = noteToDelete.title || 'Untitled Note';
+            setNoteToDelete(null);
+            await updateSeedling(id, { status: 'archived' });
+            triggerPushNotification('Note Archived', `"${title}" moved to Vault Archive.`, 'system');
+          }}
+        />
       )}
 
     </div>

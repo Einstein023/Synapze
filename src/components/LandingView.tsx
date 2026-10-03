@@ -47,6 +47,17 @@ export const LandingView: React.FC<LandingViewProps> = ({ onStart, onNavigateToA
   const [wordIndex, setWordIndex] = useState(0);
 
   // Hero cards drag offsets and drag-end snapback logic
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   const card1X = useMotionValue(0);
   const card1Y = useMotionValue(0);
   const card2X = useMotionValue(0);
@@ -394,30 +405,30 @@ export const LandingView: React.FC<LandingViewProps> = ({ onStart, onNavigateToA
               rotate: { type: "spring", stiffness: 80, damping: 14, delay: 0.2 },
               scale: { type: "spring", stiffness: 80, damping: 14, delay: 0.2 }
             }}
-            className="absolute left-4 sm:left-12 top-6 z-10"
+            className="absolute left-2 sm:left-12 top-4 sm:top-6 z-10"
             style={{ transformOrigin: 'center' }}
           >
             <motion.div
-              drag
-              dragConstraints={heroRef}
-              dragElastic={0.15}
-              onDragStart={() => handleCardDragStart(1)}
-              onDragEnd={() => handleCardDragEnd(1)}
-              style={{ x: card1X, y: card1Y }}
-              className="cursor-grab active:cursor-grabbing"
+              drag={!isMobile}
+              dragConstraints={isMobile ? undefined : heroRef}
+              dragElastic={isMobile ? 0 : 0.15}
+              onDragStart={!isMobile ? () => handleCardDragStart(1) : undefined}
+              onDragEnd={!isMobile ? () => handleCardDragEnd(1) : undefined}
+              style={{ x: isMobile ? 0 : card1X, y: isMobile ? 0 : card1Y }}
+              className={isMobile ? "select-none touch-pan-y" : "cursor-grab active:cursor-grabbing"}
             >
               <motion.div
-                animate={{ y: [0, -6, 0] }}
-                whileHover={{ scale: 1.05 }}
+                animate={{ y: isMobile ? [0, -8, 0] : [0, -6, 0] }}
+                whileHover={!isMobile ? { scale: 1.05 } : undefined}
                 transition={{
                   y: {
-                    delay: 1.0,
-                    duration: 5,
+                    delay: isMobile ? 0.2 : 1.0,
+                    duration: isMobile ? 4.5 : 5,
                     repeat: Infinity,
                     ease: "easeInOut"
                   }
                 }}
-                className="bg-[#fdda64] w-64 p-5 rounded-2xl shadow-xl border border-[#eed052]"
+                className="bg-[#fdda64] w-60 sm:w-64 p-4 sm:p-5 rounded-2xl shadow-xl border border-[#eed052]"
               >
                 {/* Top tiny pushpin bar styling */}
                 <div className="flex gap-1 mb-3">
@@ -469,29 +480,29 @@ export const LandingView: React.FC<LandingViewProps> = ({ onStart, onNavigateToA
               rotate: { type: "spring", stiffness: 80, damping: 14, delay: 0.35 },
               scale: { type: "spring", stiffness: 80, damping: 14, delay: 0.35 }
             }}
-            className="absolute right-4 sm:right-10 top-2 z-0"
+            className="absolute right-2 sm:right-10 top-1 sm:top-2 z-0"
           >
             <motion.div
-              drag
-              dragConstraints={heroRef}
-              dragElastic={0.15}
-              onDragStart={() => handleCardDragStart(2)}
-              onDragEnd={() => handleCardDragEnd(2)}
-              style={{ x: card2X, y: card2Y }}
-              className="cursor-grab active:cursor-grabbing"
+              drag={!isMobile}
+              dragConstraints={isMobile ? undefined : heroRef}
+              dragElastic={isMobile ? 0 : 0.15}
+              onDragStart={!isMobile ? () => handleCardDragStart(2) : undefined}
+              onDragEnd={!isMobile ? () => handleCardDragEnd(2) : undefined}
+              style={{ x: isMobile ? 0 : card2X, y: isMobile ? 0 : card2Y }}
+              className={isMobile ? "select-none touch-pan-y" : "cursor-grab active:cursor-grabbing"}
             >
               <motion.div
-                animate={{ y: [0, 8, 0] }}
-                whileHover={{ scale: 1.05 }}
+                animate={{ y: isMobile ? [0, 9, 0] : [0, 8, 0] }}
+                whileHover={!isMobile ? { scale: 1.05 } : undefined}
                 transition={{
                   y: {
-                    delay: 1.15,
-                    duration: 6,
+                    delay: isMobile ? 0.7 : 1.15,
+                    duration: isMobile ? 5.2 : 6,
                     repeat: Infinity,
                     ease: "easeInOut"
                   }
                 }}
-                className="bg-[#d8efff] w-60 p-5 rounded-3xl shadow-lg border border-[#badcfe]"
+                className="bg-[#d8efff] w-56 sm:w-60 p-4 sm:p-5 rounded-3xl shadow-lg border border-[#badcfe]"
               >
                 {/* Folder tab circle */}
                 <div className="flex items-center gap-2 mb-3">
@@ -516,36 +527,38 @@ export const LandingView: React.FC<LandingViewProps> = ({ onStart, onNavigateToA
             initial={{ opacity: 0, y: 100, scale: 0.9 }}
             animate={{ 
               opacity: 1, 
+              y: 0,
               scale: 1
             }}
             transition={{
               opacity: { duration: 0.8, delay: 0.5 },
+              y: { type: "spring", stiffness: 90, damping: 13, delay: 0.5 },
               scale: { type: "spring", stiffness: 90, damping: 13, delay: 0.5 }
             }}
-            className="absolute right-2 sm:right-14 bottom-16 z-20"
+            className="absolute right-1 sm:right-14 bottom-12 sm:bottom-16 z-20"
           >
             <motion.div
-              drag
-              dragConstraints={heroRef}
-              dragElastic={0.15}
-              onDragStart={() => handleCardDragStart(3)}
-              onDragEnd={() => handleCardDragEnd(3)}
-              style={{ x: card3X, y: card3Y }}
-              className="cursor-grab active:cursor-grabbing"
+              drag={!isMobile}
+              dragConstraints={isMobile ? undefined : heroRef}
+              dragElastic={isMobile ? 0 : 0.15}
+              onDragStart={!isMobile ? () => handleCardDragStart(3) : undefined}
+              onDragEnd={!isMobile ? () => handleCardDragEnd(3) : undefined}
+              style={{ x: isMobile ? 0 : card3X, y: isMobile ? 0 : card3Y }}
+              className={isMobile ? "select-none touch-pan-y" : "cursor-grab active:cursor-grabbing"}
             >
               <motion.div
-                animate={{ y: [0, -10, 0] }}
-                whileHover={{ scale: 1.04 }}
+                animate={{ y: isMobile ? [0, -8, 0] : [0, -10, 0] }}
+                whileHover={!isMobile ? { scale: 1.04 } : undefined}
                 transition={{
                   y: {
                     type: "tween",
-                    delay: 1.3,
-                    duration: 5.5,
+                    delay: isMobile ? 1.2 : 1.3,
+                    duration: isMobile ? 4.8 : 5.5,
                     repeat: Infinity,
                     ease: "easeInOut"
                   }
                 }}
-                className="bg-white w-72 p-5 rounded-2xl shadow-2xl border border-slate-100"
+                className="bg-white w-64 sm:w-72 p-4 sm:p-5 rounded-2xl shadow-2xl border border-slate-100"
               >
                 <div className="flex items-center gap-2 mb-2">
                   <PenTool className="w-4 h-4 text-[#203d36]" />
