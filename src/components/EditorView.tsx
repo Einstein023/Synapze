@@ -58,6 +58,7 @@ export const EditorView: React.FC<EditorViewProps> = ({ activeSeedlingId, onBack
   }, []);
 
   const lastLoadedIdRef = useRef<string | null>(undefined);
+  const hasLoadedNoteRef = useRef<boolean>(false);
   const titleInputRef = useRef<HTMLInputElement>(null);
 
   // Core state for active note
@@ -99,15 +100,44 @@ export const EditorView: React.FC<EditorViewProps> = ({ activeSeedlingId, onBack
     };
   }, [isDeleteModalOpen]);
 
-  // Load / Setup current note data & auto-focus title
+  // Load / Setup current note data & auto-focus title with resilient recovery
   useEffect(() => {
-    if (lastLoadedIdRef.current !== activeSeedlingId) {
-      lastLoadedIdRef.current = activeSeedlingId;
-      activeSeedlingIdRef.current = activeSeedlingId;
-      
-      if (activeSeedlingId) {
-        const activeSeed = seedlings.find(s => s.id === activeSeedlingId);
+    if (activeSeedlingId) {
+      if (lastLoadedIdRef.current !== activeSeedlingId || !hasLoadedNoteRef.current) {
+        // 1. Try finding in current seedlings state
+        let activeSeed = seedlings.find(s => s.id === activeSeedlingId);
+
+        // 2. If not in state (e.g. reload before Firestore or state fully hydrated), check local caches directly!
+        if (!activeSeed) {
+          const allBackup = localStorage.getItem('synapze_all_saved_notes');
+          if (allBackup) {
+            try {
+              const parsed: SeedlingNode[] = JSON.parse(allBackup);
+              activeSeed = parsed.find(s => s.id === activeSeedlingId);
+            } catch {}
+          }
+        }
+        if (!activeSeed) {
+          for (let i = 0; i < localStorage.length; i++) {
+            const k = localStorage.key(i);
+            if (k && k.startsWith('synapze_seed_')) {
+              try {
+                const parsed: SeedlingNode[] = JSON.parse(localStorage.getItem(k) || '[]');
+                const found = parsed.find(s => s.id === activeSeedlingId);
+                if (found) {
+                  activeSeed = found;
+                  break;
+                }
+              } catch {}
+            }
+          }
+        }
+
         if (activeSeed) {
+          lastLoadedIdRef.current = activeSeedlingId;
+          activeSeedlingIdRef.current = activeSeedlingId;
+          hasLoadedNoteRef.current = true;
+
           setTitle(activeSeed.title);
           const initialHtml = convertMarkdownToHtml(activeSeed.content);
           setContent(initialHtml);
@@ -120,8 +150,19 @@ export const EditorView: React.FC<EditorViewProps> = ({ activeSeedlingId, onBack
           if (editorRef.current) {
             editorRef.current.innerHTML = initialHtml;
           }
+
+          setTimeout(() => {
+            titleInputRef.current?.focus();
+          }, 100);
         }
-      } else {
+        // If not found yet, do not lock lastLoadedIdRef so subsequent renders with loaded seedlings will retry!
+      }
+    } else {
+      if (lastLoadedIdRef.current !== null) {
+        lastLoadedIdRef.current = null;
+        activeSeedlingIdRef.current = null;
+        hasLoadedNoteRef.current = true;
+
         // Build an empty starter seed
         setTitle('');
         setTagsInput('');
@@ -135,13 +176,13 @@ export const EditorView: React.FC<EditorViewProps> = ({ activeSeedlingId, onBack
         if (editorRef.current) {
           editorRef.current.innerHTML = starterHtml;
         }
-      }
 
-      setTimeout(() => {
-        titleInputRef.current?.focus();
-      }, 100);
+        setTimeout(() => {
+          titleInputRef.current?.focus();
+        }, 100);
+      }
     }
-  }, [activeSeedlingId]);
+  }, [activeSeedlingId, seedlings]);
 
   const scrollToCursor = () => {
     const selection = window.getSelection();
@@ -782,6 +823,11 @@ export const EditorView: React.FC<EditorViewProps> = ({ activeSeedlingId, onBack
 
   // Centralized save function
   const saveNodeData = async (isAutosave: boolean = false) => {
+    // Prevent overwriting an existing note before it has finished loading
+    if (activeSeedlingId && !hasLoadedNoteRef.current) {
+      return activeSeedlingId;
+    }
+
     if (isSavingRef.current) {
       needFollowUpSaveRef.current = true;
       return activeSeedlingIdRef.current;
@@ -872,6 +918,31 @@ export const EditorView: React.FC<EditorViewProps> = ({ activeSeedlingId, onBack
 
     return () => clearTimeout(timer);
   }, [title, content, tagsInput, status, isTask, isCompleted, isDirty]);
+
+  // Immediate save on page unload, tab switch, device lock, or browser refresh
+  useEffect(() => {
+    const handleImmediateSave = () => {
+      if (isDirty && hasLoadedNoteRef.current) {
+        saveNodeData(true);
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden' && isDirty && hasLoadedNoteRef.current) {
+        saveNodeData(true);
+      }
+    };
+
+    window.addEventListener('beforeunload', handleImmediateSave);
+    window.addEventListener('pagehide', handleImmediateSave);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener('beforeunload', handleImmediateSave);
+      window.removeEventListener('pagehide', handleImmediateSave);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [isDirty, title, content, tagsInput, status, isTask, isCompleted]);
 
   const handleDelete = () => {
     const targetId = activeSeedlingIdRef.current || activeSeedlingId || localActiveId;

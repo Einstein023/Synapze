@@ -355,6 +355,31 @@ export const GardenProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
         localStorage.setItem('synapze_author_uid', user.uid);
         localStorage.setItem('synapze_author_email', user.email || '');
+
+        // Migrate guest notes if present to prevent any loss of notes created prior to sign in
+        const guestSeedStr = localStorage.getItem('synapze_seed_garden-guest');
+        if (guestSeedStr) {
+          try {
+            const guestSeeds: SeedlingNode[] = JSON.parse(guestSeedStr);
+            if (Array.isArray(guestSeeds) && guestSeeds.length > 0) {
+              const currentSeedStr = localStorage.getItem(`synapze_seed_${user.uid}`) || '[]';
+              const currentSeeds: SeedlingNode[] = JSON.parse(currentSeedStr);
+              const mergedGuestMap = new Map<string, SeedlingNode>();
+              currentSeeds.forEach(s => mergedGuestMap.set(s.id, s));
+              guestSeeds.forEach(s => {
+                if (!mergedGuestMap.has(s.id)) {
+                  mergedGuestMap.set(s.id, { ...s, userId: user.uid });
+                }
+              });
+              const merged = Array.from(mergedGuestMap.values());
+              localStorage.setItem(`synapze_seed_${user.uid}`, JSON.stringify(merged));
+              localStorage.setItem('synapze_all_saved_notes', JSON.stringify(merged));
+            }
+          } catch {}
+        }
+
+        // Immediate local recovery for user.uid so UI has notes before network responds
+        recoveryLocalStorage(user.uid);
         
         // Load documents from Firestore if online
         if (!isOffline) {
@@ -498,8 +523,47 @@ export const GardenProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       setProfile(def);
     }
 
+    // Resilient Seedling Recovery with multi-source fallback
+    let recoveredSeedlings: SeedlingNode[] = [];
     if (cachedSeedlings) {
-      try { setSeedlings(JSON.parse(cachedSeedlings)); } catch { setSeedlings(defaultSeedlings(uid)); }
+      try {
+        const parsed = JSON.parse(cachedSeedlings);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          recoveredSeedlings = parsed;
+        }
+      } catch {}
+    }
+
+    // Check universal store if user-specific store is empty
+    if (recoveredSeedlings.length === 0) {
+      const universalBackup = localStorage.getItem('synapze_all_saved_notes');
+      if (universalBackup) {
+        try {
+          const parsed = JSON.parse(universalBackup);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            recoveredSeedlings = parsed;
+          }
+        } catch {}
+      }
+    }
+
+    // Check guest store if switching to authenticated user
+    if (recoveredSeedlings.length === 0 && uid !== 'garden-guest') {
+      const guestBackup = localStorage.getItem('synapze_seed_garden-guest');
+      if (guestBackup) {
+        try {
+          const parsed = JSON.parse(guestBackup);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            recoveredSeedlings = parsed;
+          }
+        } catch {}
+      }
+    }
+
+    if (recoveredSeedlings.length > 0) {
+      setSeedlings(recoveredSeedlings);
+      localStorage.setItem(`synapze_seed_${uid}`, JSON.stringify(recoveredSeedlings));
+      localStorage.setItem('synapze_all_saved_notes', JSON.stringify(recoveredSeedlings));
     } else {
       setSeedlings(defaultSeedlings(uid));
     }
@@ -528,8 +592,8 @@ export const GardenProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       const seedCol = collection(db, 'users', uid, 'seedlings');
       const actCol = collection(db, 'users', uid, 'activities');
 
-      // Helper function to fetch Firestore data with a fast 1.5-second timeout so UI never hangs
-      const fetchWithTimeout = <T,>(promise: Promise<T>, ms = 1500): Promise<T | null> => {
+      // Helper function to fetch Firestore data with a 3.5-second timeout so mobile/slow networks don't prematurely abort
+      const fetchWithTimeout = <T,>(promise: Promise<T>, ms = 3500): Promise<T | null> => {
         return Promise.race([
           promise.catch(() => null),
           new Promise<null>((resolve) => setTimeout(() => resolve(null), ms))
@@ -598,18 +662,63 @@ export const GardenProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       }
       localStorage.setItem(`synapze_prof_${uid}`, JSON.stringify(finalProfile));
 
-      // Fetch Seedlings
-      let fetchedSeedlings: SeedlingNode[] = [];
+      // Resilient Seedlings Merge: Never overwrite local saved notes with an empty array
+      const localSeedCacheStr = localStorage.getItem(`synapze_seed_${uid}`) || localStorage.getItem('synapze_all_saved_notes');
+      let localSeedCache: SeedlingNode[] = [];
+      if (localSeedCacheStr) {
+        try {
+          const parsed = JSON.parse(localSeedCacheStr);
+          if (Array.isArray(parsed)) localSeedCache = parsed;
+        } catch {}
+      }
+
       if (seedSnap) {
+        const remoteSeedlings: SeedlingNode[] = [];
         seedSnap.forEach((docSnap) => {
-          fetchedSeedlings.push(docSnap.data() as SeedlingNode);
+          const data = docSnap.data() as SeedlingNode;
+          if (data && data.id) {
+            remoteSeedlings.push(data);
+          }
         });
+
+        // Two-way merge map: retains all local notes and syncs missing ones to cloud
+        const mergedMap = new Map<string, SeedlingNode>();
+        
+        for (const rem of remoteSeedlings) {
+          mergedMap.set(rem.id, rem);
+        }
+
+        for (const loc of localSeedCache) {
+          if (!mergedMap.has(loc.id)) {
+            // Note was saved locally but not yet in Firestore: keep it and save to Firestore
+            mergedMap.set(loc.id, loc);
+            const sRef = doc(db, 'users', uid, 'seedlings', loc.id);
+            setDoc(sRef, loc).catch(() => {});
+          } else {
+            // Exists in both: preserve the one with newer updatedAt
+            const rem = mergedMap.get(loc.id)!;
+            const locTime = new Date(loc.updatedAt || loc.createdAt || 0).getTime();
+            const remTime = new Date(rem.updatedAt || rem.createdAt || 0).getTime();
+            if (locTime > remTime) {
+              mergedMap.set(loc.id, loc);
+              const sRef = doc(db, 'users', uid, 'seedlings', loc.id);
+              setDoc(sRef, loc).catch(() => {});
+            }
+          }
+        }
+
+        const finalSeedlings = Array.from(mergedMap.values());
+        finalSeedlings.sort((a, b) => new Date(b.updatedAt || b.createdAt || 0).getTime() - new Date(a.updatedAt || a.createdAt || 0).getTime());
+
+        setSeedlings(finalSeedlings);
+        localStorage.setItem(`synapze_seed_${uid}`, JSON.stringify(finalSeedlings));
+        localStorage.setItem('synapze_all_saved_notes', JSON.stringify(finalSeedlings));
+      } else {
+        // seedSnap timed out or had a transient network issue: KEEP local seedlings intact
+        if (localSeedCache.length > 0) {
+          setSeedlings(localSeedCache);
+        }
       }
-      if (fetchedSeedlings.length === 0) {
-        fetchedSeedlings = defaultSeedlings(uid);
-      }
-      setSeedlings(fetchedSeedlings);
-      localStorage.setItem(`synapze_seed_${uid}`, JSON.stringify(fetchedSeedlings));
 
       // Fetch Activities
       let fetchedActivities: ActivityMetric[] = [];
@@ -863,11 +972,14 @@ export const GardenProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     };
 
     setSeedlings(prev => {
+      let updated: SeedlingNode[];
       if (newId && prev.some(s => s.id === newId)) {
-        return prev.map(s => s.id === newId ? { ...s, ...newSeed } : s);
+        updated = prev.map(s => s.id === newId ? { ...s, ...newSeed } : s);
+      } else {
+        updated = [newSeed, ...prev];
       }
-      const updated = [newSeed, ...prev];
       localStorage.setItem(`synapze_seed_${currentUserUid}`, JSON.stringify(updated));
+      localStorage.setItem('synapze_all_saved_notes', JSON.stringify(updated));
       return updated;
     });
 
@@ -918,6 +1030,7 @@ export const GardenProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         return s;
       });
       localStorage.setItem(`synapze_seed_${currentUserUid}`, JSON.stringify(updated));
+      localStorage.setItem('synapze_all_saved_notes', JSON.stringify(updated));
       
       const updatedDoc = updated.find(s => s.id === id);
       if (updatedDoc && isFirebaseConfigured && !isOffline && currentUserUid !== 'garden-guest') {
@@ -936,6 +1049,7 @@ export const GardenProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       const target = prev.find(s => s.id === id);
       const updated = prev.filter(s => s.id !== id);
       localStorage.setItem(`synapze_seed_${currentUserUid}`, JSON.stringify(updated));
+      localStorage.setItem('synapze_all_saved_notes', JSON.stringify(updated));
       
       if (target) {
         logActivity(`Composted note file: "${target.title}"`, 5);
